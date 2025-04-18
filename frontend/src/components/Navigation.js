@@ -7,7 +7,6 @@ import {
   Box, 
   Drawer, 
   List, 
-  ListItem, 
   ListItemIcon, 
   ListItemText, 
   IconButton, 
@@ -19,43 +18,79 @@ import {
   useTheme,
   useMediaQuery,
   Collapse,
-  ListItemButton
+  ListItemButton,
+  styled,
+  alpha,
+  Tooltip,
+  Container,
+  Button
 } from '@mui/material';
 import { 
   Menu as MenuIcon, 
   Dashboard as DashboardIcon, 
   Inventory as InventoryIcon, 
-  Assignment as AssignmentIcon, 
+  Article as ArticleIcon, 
   Logout as LogoutIcon, 
-  Settings as SettingsIcon, 
+  Tune as TuneIcon, 
   NotificationsOutlined as NotificationsIcon, 
   Search as SearchIcon,
   KeyboardArrowDown as ExpandMoreIcon,
   KeyboardArrowUp as ExpandLessIcon,
   Person as PersonIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Add as AddIcon,
+  NoteAdd as NoteAddIcon,
+  Settings as SettingsIcon,
+  AccountCircle as AccountCircleIcon,
+  SpeedOutlined as SpeedIcon
 } from '@mui/icons-material';
-import { Link, useLocation } from 'react-router-dom';
-import { styled } from '@mui/material/styles';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 // Styling
-const drawerWidth = 240;
+const drawerWidth = 280;
 
-const LogoTypography = styled(Typography)(({ theme }) => ({
-  fontWeight: 'bold',
-  color: 'inherit',
-  textDecoration: 'none',
+// Styled components for premium UI
+const StyledAppBar = styled(AppBar)(({ theme }) => ({
+  backgroundColor: theme.palette.background.paper,
+  backdropFilter: 'blur(8px)',
+  boxShadow: 'none',
+  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+  color: theme.palette.text.primary,
+  zIndex: theme.zIndex.drawer + 1,
+  height: 64,
+}));
+
+const StyledLogo = styled(Typography)(({ theme }) => ({
+  fontWeight: 800,
+  background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+  backgroundClip: 'text',
+  textFillColor: 'transparent',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  letterSpacing: '-0.5px',
+  marginRight: theme.spacing(2),
   display: 'flex',
   alignItems: 'center',
-  '&:hover': {
-    textDecoration: 'none',
-  }
+  textDecoration: 'none',
+}));
+
+const StyledDrawer = styled(Drawer)(({ theme }) => ({
+  width: drawerWidth,
+  flexShrink: 0,
+  '& .MuiDrawer-paper': {
+    width: drawerWidth,
+    boxSizing: 'border-box',
+    background: `linear-gradient(180deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.background.paper, 0.98)} 100%)`,
+    backdropFilter: 'blur(8px)',
+    borderRight: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+    boxShadow: '0px 0px 20px rgba(0, 0, 0, 0.03)',
+  },
 }));
 
 const StyledBadge = styled(Badge)(({ theme }) => ({
   '& .MuiBadge-badge': {
-    backgroundColor: '#44b700',
-    color: '#44b700',
+    backgroundColor: theme.palette.success.main,
+    color: theme.palette.success.main,
     boxShadow: `0 0 0 2px ${theme.palette.background.paper}`,
     '&::after': {
       position: 'absolute',
@@ -68,6 +103,73 @@ const StyledBadge = styled(Badge)(({ theme }) => ({
       content: '""',
     },
   }
+}));
+
+const StyledListItemButton = styled(ListItemButton)(({ theme, active }) => ({
+  margin: '4px 12px',
+  borderRadius: '8px',
+  transition: 'all 0.2s ease',
+  backgroundColor: active ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+  '&:hover': {
+    backgroundColor: active ? alpha(theme.palette.primary.main, 0.12) : alpha(theme.palette.primary.main, 0.04),
+  },
+}));
+
+const StyledAvatar = styled(Avatar)(({ theme }) => ({
+  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+  color: theme.palette.primary.main,
+  fontWeight: 600,
+  width: 40,
+  height: 40,
+  transition: 'all 0.2s ease',
+  '&:hover': {
+    transform: 'scale(1.05)',
+  },
+}));
+
+const SubListItemButton = styled(ListItemButton)(({ theme, active }) => ({
+  margin: '4px 12px 4px 24px',
+  borderRadius: '8px',
+  transition: 'all 0.2s ease',
+  backgroundColor: active ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+  '&:hover': {
+    backgroundColor: active ? alpha(theme.palette.primary.main, 0.12) : alpha(theme.palette.primary.main, 0.04),
+  },
+}));
+
+const RoleChip = styled(Box)(({ theme }) => ({
+  background: theme.palette.mode === 'dark' 
+    ? alpha(theme.palette.primary.main, 0.15)
+    : alpha(theme.palette.primary.main, 0.08),
+  borderRadius: '8px',
+  padding: '4px 12px',
+  fontSize: '0.75rem',
+  fontWeight: '600',
+  display: 'flex',
+  alignItems: 'center',
+  border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+  color: theme.palette.primary.main
+}));
+
+const ActionButton = styled(Button)(({ theme }) => ({
+  borderRadius: '8px',
+  padding: '8px 16px',
+  textTransform: 'none',
+  fontWeight: 600,
+  boxShadow: 'none',
+  '&:hover': {
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.07)'
+  }
+}));
+
+const HeaderIconButton = styled(IconButton)(({ theme }) => ({
+  backgroundColor: alpha(theme.palette.action.hover, 0.04),
+  borderRadius: '8px',
+  padding: '8px',
+  marginRight: '8px',
+  '&:hover': {
+    backgroundColor: alpha(theme.palette.action.hover, 0.1),
+  },
 }));
 
 // Main component
@@ -83,6 +185,7 @@ const Navigation = () => {
   });
   
   const location = useLocation();
+  const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -135,21 +238,21 @@ const Navigation = () => {
   const navigationSections = [
     {
       id: 'saleco',
-      title: 'SaleCo',
-      icon: <AssignmentIcon />,
+      title: 'Document Management',
+      icon: <ArticleIcon />,
       items: [
-        { text: 'Dashboard', path: '/saleco', icon: <DashboardIcon /> },
-        { text: 'Create Document', path: '/saleco/create', icon: <AssignmentIcon /> },
+        { text: 'Dashboard', path: '/saleco', icon: <SpeedIcon /> },
+        { text: 'Create Document', path: '/saleco/create', icon: <NoteAddIcon /> },
       ],
       visible: true
     },
     {
       id: 'qa',
       title: 'Quality Assurance',
-      icon: <SettingsIcon />,
+      icon: <TuneIcon />,
       items: [
-        { text: 'Dashboard', path: '/qa', icon: <DashboardIcon /> },
-        { text: 'Review Documents', path: '/qa/review', icon: <AssignmentIcon /> },
+        { text: 'Dashboard', path: '/qa', icon: <SpeedIcon /> },
+        { text: 'Review Documents', path: '/qa/review', icon: <ArticleIcon /> },
       ],
       visible: true
     },
@@ -158,7 +261,7 @@ const Navigation = () => {
       title: 'Inventory',
       icon: <InventoryIcon />,
       items: [
-        { text: 'Dashboard', path: '/inventory', icon: <DashboardIcon /> },
+        { text: 'Dashboard', path: '/inventory', icon: <SpeedIcon /> },
         { text: 'Inventory List', path: '/inventory/list', icon: <InventoryIcon /> },
       ],
       visible: true
@@ -187,222 +290,310 @@ const Navigation = () => {
         </Box>
       )}
       
-      <Toolbar />
-      <Divider />
-      <List sx={{ p: 1 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        padding: theme.spacing(3, 2) 
+      }}>
+        <StyledLogo 
+          variant="h5" 
+          component={Link} 
+          to="/"
+        >
+          DocControl
+        </StyledLogo>
+      </Box>
+      
+      <Divider sx={{ opacity: 0.1, mx: 2, mb: 3 }} />
+      
+      <Box sx={{ px: 3, mb: 4 }}>
+        <ActionButton 
+          variant="contained" 
+          fullWidth 
+          startIcon={<AddIcon />}
+          component={Link}
+          to="/saleco/create"
+          size="large"
+          sx={{ py: 1 }}
+        >
+          New Document
+        </ActionButton>
+      </Box>
+      
+      <List sx={{ px: 1 }}>
         {navigationSections.map((section) => (
           <React.Fragment key={section.id}>
-            <ListItemButton 
+            <StyledListItemButton 
               onClick={() => handleSectionToggle(section.id)}
-              sx={{ 
-                borderRadius: 1,
-                mb: 0.5,
-                bgcolor: openSections[section.id] ? 'rgba(255, 87, 0, 0.08)' : 'transparent',
-              }}
+              active={openSections[section.id]}
             >
               <ListItemIcon sx={{ 
-                color: openSections[section.id] ? theme.palette.primary.main : 'inherit'
+                color: openSections[section.id] ? theme.palette.primary.main : alpha(theme.palette.text.primary, 0.6),
+                minWidth: '40px'
               }}>
                 {section.icon}
               </ListItemIcon>
               <ListItemText 
                 primary={section.title} 
                 primaryTypographyProps={{ 
-                  fontWeight: openSections[section.id] ? 'bold' : 'normal',
-                  color: openSections[section.id] ? theme.palette.primary.main : 'inherit'
+                  fontWeight: openSections[section.id] ? 600 : 500,
+                  color: openSections[section.id] ? theme.palette.primary.main : alpha(theme.palette.text.primary, 0.85),
+                  fontSize: '0.95rem'
                 }} 
               />
-              {openSections[section.id] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </ListItemButton>
+              {openSections[section.id] ? 
+                <ExpandLessIcon fontSize="small" color={openSections[section.id] ? "primary" : "inherit"} /> : 
+                <ExpandMoreIcon fontSize="small" />
+              }
+            </StyledListItemButton>
             
             <Collapse in={openSections[section.id]} timeout="auto" unmountOnExit>
               <List component="div" disablePadding>
-                {section.items.map((item) => (
-                  <ListItemButton
-                    key={item.text}
-                    component={Link}
-                    to={item.path}
-                    selected={location.pathname === item.path}
-                    onClick={isMobile ? handleDrawerToggle : undefined}
-                    sx={{
-                      pl: 4,
-                      borderRadius: 1,
-                      mb: 0.5,
-                      ml: 1,
-                      '&.Mui-selected': {
-                        bgcolor: 'rgba(255, 87, 0, 0.15)',
-                        '&:hover': {
-                          bgcolor: 'rgba(255, 87, 0, 0.25)'
-                        }
-                      },
-                      '&:hover': {
-                        bgcolor: 'rgba(255, 87, 0, 0.08)'
-                      }
-                    }}
-                  >
-                    <ListItemIcon sx={{ 
-                      color: location.pathname === item.path ? theme.palette.primary.main : 'inherit',
-                      minWidth: 36
-                    }}>
-                      {item.icon}
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary={item.text} 
-                      primaryTypographyProps={{
-                        fontSize: '0.9rem',
-                        fontWeight: location.pathname === item.path ? 'bold' : 'normal',
-                        color: location.pathname === item.path ? theme.palette.primary.main : 'inherit'
-                      }}
-                    />
-                  </ListItemButton>
-                ))}
+                {section.items.map((item) => {
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <SubListItemButton
+                      key={item.text}
+                      component={Link}
+                      to={item.path}
+                      active={isActive}
+                      onClick={isMobile ? handleDrawerToggle : undefined}
+                    >
+                      <ListItemIcon sx={{ 
+                        color: isActive ? theme.palette.primary.main : alpha(theme.palette.text.primary, 0.6),
+                        minWidth: '36px'
+                      }}>
+                        {item.icon}
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={item.text} 
+                        primaryTypographyProps={{
+                          fontSize: '0.875rem',
+                          fontWeight: isActive ? 600 : 500,
+                          color: isActive ? theme.palette.primary.main : alpha(theme.palette.text.primary, 0.7)
+                        }}
+                      />
+                    </SubListItemButton>
+                  );
+                })}
               </List>
             </Collapse>
             
-            <Divider sx={{ my: 1 }} />
+            <Divider sx={{ my: 2, opacity: 0.1 }} />
           </React.Fragment>
         ))}
       </List>
+      
+      <Box sx={{ 
+        position: 'absolute', 
+        bottom: 0, 
+        width: '100%', 
+        p: 2,
+        borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+        backdropFilter: 'blur(8px)',
+        backgroundColor: alpha(theme.palette.background.paper, 0.8)
+      }}>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            p: 1,
+            borderRadius: '8px',
+            '&:hover': {
+              backgroundColor: alpha(theme.palette.divider, 0.05)
+            },
+            cursor: 'pointer'
+          }}
+          onClick={handleMenu}
+        >
+          <StyledBadge
+            overlap="circular"
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            variant="dot"
+          >
+            <StyledAvatar>
+              {userName.charAt(0)}
+            </StyledAvatar>
+          </StyledBadge>
+          <Box sx={{ ml: 2 }}>
+            <Typography variant="subtitle2" fontWeight={600}>{userName}</Typography>
+            <Typography variant="caption" color="text.secondary">{userRole}</Typography>
+          </Box>
+        </Box>
+      </Box>
     </div>
   );
 
   return (
     <>
       {/* Top AppBar */}
-      <AppBar 
-        position="fixed"
-        elevation={0}
-        sx={{ 
-          zIndex: theme => theme.zIndex.drawer + 1,
-          backgroundImage: 'linear-gradient(to right, #FF5700, #FF8033)',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-        }}
-      >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { md: 'none' } }}
-          >
-            <MenuIcon />
-          </IconButton>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-            <LogoTypography 
-              variant="h6" 
-              noWrap 
-              component={Link} 
-              to="/"
-              sx={{ 
-                mr: 2,
-                display: 'flex',
-                fontWeight: 800,
-                letterSpacing: '0.5px'
-              }}
+      <StyledAppBar position="fixed">
+        <Container maxWidth="xl">
+          <Toolbar disableGutters sx={{ height: 64 }}>
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ display: { md: 'none' }, mr: 2 }}
             >
-              DocumentControl
-            </LogoTypography>
+              <MenuIcon />
+            </IconButton>
             
-            {/* Role indicator */}
-            {userRole && (
-              <Box 
-                sx={{ 
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 1,
-                  display: { xs: 'none', sm: 'flex' },
-                  alignItems: 'center'
+            <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', flexGrow: 1 }}>
+              <StyledLogo 
+                variant="h5" 
+                component={Link} 
+                to="/"
+              >
+                DocControl
+              </StyledLogo>
+              
+              {/* Role indicator */}
+              {userRole && (
+                <RoleChip>
+                  <Typography variant="body2" fontWeight="600">
+                    {userRole}
+                  </Typography>
+                </RoleChip>
+              )}
+            </Box>
+            
+            <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
+              <StyledLogo 
+                variant="h5" 
+                component={Link}
+                to="/"
+              >
+                DocControl
+              </StyledLogo>
+            </Box>
+            
+            {/* Right section: notifications, search, and user menu */}
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              {/* Search Button */}
+              <Tooltip title="Search">
+                <HeaderIconButton color="inherit" size="medium">
+                  <SearchIcon fontSize="small" />
+                </HeaderIconButton>
+              </Tooltip>
+              
+              {/* Notification Icon */}
+              <Tooltip title="Notifications">
+                <HeaderIconButton color="inherit" size="medium">
+                  <Badge badgeContent={4} color="error">
+                    <NotificationsIcon fontSize="small" />
+                  </Badge>
+                </HeaderIconButton>
+              </Tooltip>
+              
+              {/* Settings button */}
+              <Tooltip title="Settings">
+                <HeaderIconButton color="inherit" size="medium">
+                  <SettingsIcon fontSize="small" />
+                </HeaderIconButton>
+              </Tooltip>
+              
+              {/* User Avatar and Menu */}
+              <Tooltip title={`Logged in as ${userName}`}>
+                <IconButton
+                  onClick={handleMenu}
+                  color="inherit"
+                  sx={{ ml: 1 }}
+                >
+                  <StyledBadge
+                    overlap="circular"
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    variant="dot"
+                  >
+                    <StyledAvatar>
+                      {userName.charAt(0)}
+                    </StyledAvatar>
+                  </StyledBadge>
+                </IconButton>
+              </Tooltip>
+              
+              <Menu
+                id="menu-appbar"
+                anchorEl={anchorEl}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'right',
+                }}
+                keepMounted
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+                PaperProps={{
+                  sx: {
+                    mt: 1.5,
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                    minWidth: 200,
+                  }
                 }}
               >
-                <Typography variant="body2" fontWeight="bold">
-                  {userRole}
-                </Typography>
-              </Box>
-            )}
-          </Box>
-          
-          {/* Right section: notifications, search, and user menu */}
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {/* Notification Icon */}
-            <IconButton color="inherit" size="large" sx={{ mr: 1 }}>
-              <Badge badgeContent={4} color="error">
-                <NotificationsIcon />
-              </Badge>
-            </IconButton>
-            
-            {/* Search Icon */}
-            <IconButton color="inherit" size="large" sx={{ mr: 1 }}>
-              <SearchIcon />
-            </IconButton>
-            
-            {/* User Avatar and Menu */}
-            <IconButton
-              onClick={handleMenu}
-              color="inherit"
-            >
-              <StyledBadge
-                overlap="circular"
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                variant="dot"
-              >
-                <Avatar sx={{ 
-                  width: 36, 
-                  height: 36, 
-                  bgcolor: 'white', 
-                  color: theme.palette.primary.main,
-                  fontWeight: 'bold'
-                }}>
-                  {userName.charAt(0)}
-                </Avatar>
-              </StyledBadge>
-            </IconButton>
-            
-            <Menu
-              id="menu-appbar"
-              anchorEl={anchorEl}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-              }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              open={Boolean(anchorEl)}
-              onClose={handleClose}
-            >
-              <Box sx={{ px: 2, py: 1 }}>
-                <Typography variant="subtitle1" fontWeight="bold">{userName}</Typography>
-                <Typography variant="caption" color="text.secondary">{userRole}</Typography>
-              </Box>
-              <Divider />
-              <MenuItem onClick={handleClose} component={Link} to="/profile">
-                <ListItemIcon>
-                  <PersonIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Profile</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={handleClose} component={Link} to="/settings">
-                <ListItemIcon>
-                  <SettingsIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Settings</ListItemText>
-              </MenuItem>
-              <Divider />
-              <MenuItem onClick={handleLogout}>
-                <ListItemIcon>
-                  <LogoutIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Logout</ListItemText>
-              </MenuItem>
-            </Menu>
-          </Box>
-        </Toolbar>
-      </AppBar>
+                <Box sx={{ px: 2, py: 1.5 }}>
+                  <Typography variant="subtitle1" fontWeight="600">{userName}</Typography>
+                  <Typography variant="caption" color="text.secondary">{userRole}</Typography>
+                </Box>
+                <Divider sx={{ opacity: 0.1 }} />
+                <MenuItem onClick={handleClose} component={Link} to="/profile"
+                  sx={{ 
+                    mx: 1, 
+                    borderRadius: '8px', 
+                    my: 0.5,
+                    '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.05) }
+                  }}
+                >
+                  <ListItemIcon>
+                    <AccountCircleIcon fontSize="small" color="primary" />
+                  </ListItemIcon>
+                  <ListItemText primary="Profile" primaryTypographyProps={{ fontSize: '0.9rem' }} />
+                </MenuItem>
+                <MenuItem onClick={handleClose} component={Link} to="/settings"
+                  sx={{ 
+                    mx: 1, 
+                    borderRadius: '8px', 
+                    my: 0.5,
+                    '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.05) }
+                  }}
+                >
+                  <ListItemIcon>
+                    <SettingsIcon fontSize="small" color="primary" />
+                  </ListItemIcon>
+                  <ListItemText primary="Settings" primaryTypographyProps={{ fontSize: '0.9rem' }} />
+                </MenuItem>
+                <Divider sx={{ opacity: 0.1 }} />
+                <MenuItem onClick={handleLogout}
+                  sx={{ 
+                    mx: 1, 
+                    borderRadius: '8px', 
+                    my: 0.5,
+                    color: theme.palette.error.main,
+                    '&:hover': { backgroundColor: alpha(theme.palette.error.main, 0.05) }
+                  }}
+                >
+                  <ListItemIcon>
+                    <LogoutIcon fontSize="small" color="error" />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Logout" 
+                    primaryTypographyProps={{ 
+                      fontSize: '0.9rem',
+                      color: theme.palette.error.main  
+                    }} 
+                  />
+                </MenuItem>
+              </Menu>
+            </Box>
+          </Toolbar>
+        </Container>
+      </StyledAppBar>
       
       {/* This is a container for the nav drawer and main content */}
       <Box sx={{ display: 'flex' }}>
@@ -421,29 +612,34 @@ const Navigation = () => {
             }}
             sx={{
               display: { xs: 'block', md: 'none' },
-              '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
             }}
           >
             {drawer}
           </Drawer>
           
           {/* Desktop drawer */}
-          <Drawer
+          <StyledDrawer
             variant="permanent"
             sx={{
               display: { xs: 'none', md: 'block' },
-              '& .MuiDrawer-paper': { 
-                boxSizing: 'border-box', 
-                width: drawerWidth,
-                borderRight: '1px solid rgba(0,0,0,0.08)',
-                boxShadow: 'rgba(0, 0, 0, 0.05) 2px 0px 20px'
-              },
             }}
             open
           >
             {drawer}
-          </Drawer>
+          </StyledDrawer>
         </Box>
+        
+        {/* Main content wrapper */}
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            p: 0,
+            width: { md: `calc(100% - ${drawerWidth}px)` },
+            ml: { md: `${drawerWidth}px` },
+            mt: '64px', // Height of AppBar
+          }}
+        />
       </Box>
     </>
   );
