@@ -199,6 +199,7 @@ exports.verifyOtp = (req, res) => {
  * Login: Authenticate user and issue JWT
  * POST /api/auth/login
  */
+// Updated login function in authController.js to ensure user data is properly returned
 exports.login = (req, res) => {
   try {
     const { email, password } = req.body;
@@ -238,7 +239,11 @@ exports.login = (req, res) => {
           user: {
             id: user.id,
             name: user.name,
-            email: user.email
+            surname: user.surname, // Include surname
+            email: user.email,
+            // Include any other needed user fields
+            employeeId: user.employeeId,
+            department: user.department
           }
         });
       });

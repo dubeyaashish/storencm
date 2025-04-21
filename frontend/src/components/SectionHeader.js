@@ -75,7 +75,7 @@ const ActionButton = styled(Button)(({ theme }) => ({
   },
 }));
 
-const SequenceButton = styled(Button)(({ theme, color }) => ({
+const SequenceButton = styled(Button)(({ theme }) => ({
   textTransform: 'none',
   display: 'flex',
   alignItems: 'center',
@@ -178,7 +178,7 @@ const SectionHeader = () => {
         <StyledBreadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
           {breadcrumbs.map((bc, idx) => (
             idx < breadcrumbs.length - 1 ? (
-              <SequenceButton key={bc.path} component={Link} to={bc.path} colorProp={alpha(theme.palette.text.primary, 0.7)}>
+              <SequenceButton key={bc.path} component={Link} to={bc.path}>
                 {bc.icon}
                 <Typography variant="body2" sx={{ ml: 0.5 }}>{bc.name}</Typography>
               </SequenceButton>

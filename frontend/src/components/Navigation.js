@@ -1,5 +1,6 @@
 // src/components/Navigation.js
 import React, { useState, useEffect } from 'react';
+import logo from './logo.png';
 import { 
   AppBar, 
   Toolbar, 
@@ -42,7 +43,9 @@ import {
   NoteAdd as NoteAddIcon,
   Settings as SettingsIcon,
   AccountCircle as AccountCircleIcon,
-  SpeedOutlined as SpeedIcon
+  SpeedOutlined as SpeedIcon,
+  Factory,
+  Nature
 } from '@mui/icons-material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
@@ -172,6 +175,17 @@ const HeaderIconButton = styled(IconButton)(({ theme }) => ({
   },
 }));
 
+const LogoImage = styled('img')(({ theme }) => ({
+  height: 48,          // bump up the size
+  width: 48,           // keep it square
+  borderRadius: '50%', // make it a perfect circle
+  objectFit: 'cover',  // ensure it fills the circle nicely
+  marginRight: theme.spacing(2),
+  cursor: 'pointer',
+}));
+
+
+
 // Main component
 const Navigation = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -181,7 +195,9 @@ const Navigation = () => {
   const [openSections, setOpenSections] = useState({
     saleco: false,
     qa: false,
-    inventory: false
+    inventory: false,
+    manufacturing: false,
+    environment: false
   });
   
   const location = useLocation();
@@ -194,8 +210,26 @@ const Navigation = () => {
     const role = localStorage.getItem('role') || '';
     setUserRole(role);
     
-    // In a real app, you might want to fetch the user's name from an API
-    setUserName('John Doe'); 
+    // Get user name from localStorage - try multiple approaches
+    let name = '';
+    
+    // Try to get from user object first
+    try {
+      const userObj = JSON.parse(localStorage.getItem('user') || '{}');
+      if (userObj && userObj.name) {
+        name = userObj.name;
+      }
+    } catch (e) {
+      console.error('Error parsing user data from localStorage:', e);
+    }
+    
+    // If not found in user object, try direct userName key
+    if (!name) {
+      name = localStorage.getItem('userName');
+    }
+    
+    // Default to role or 'User' if no name found
+    setUserName(name || role || 'User');
     
     // Open the section of the current route
     const currentPath = location.pathname;
@@ -234,7 +268,7 @@ const Navigation = () => {
     }));
   };
 
-  // Define navigation structure
+  // Define navigation structure with role-based access
   const navigationSections = [
     {
       id: 'saleco',
@@ -244,7 +278,7 @@ const Navigation = () => {
         { text: 'Dashboard', path: '/saleco', icon: <SpeedIcon /> },
         { text: 'Create Document', path: '/saleco/create', icon: <NoteAddIcon /> },
       ],
-      visible: true
+      roles: ['SaleCo'] // Only show for SaleCo role
     },
     {
       id: 'qa',
@@ -254,7 +288,7 @@ const Navigation = () => {
         { text: 'Dashboard', path: '/qa', icon: <SpeedIcon /> },
         { text: 'Review Documents', path: '/qa/review', icon: <ArticleIcon /> },
       ],
-      visible: true
+      roles: ['QA'] // Only show for QA role
     },
     {
       id: 'inventory',
@@ -264,7 +298,27 @@ const Navigation = () => {
         { text: 'Dashboard', path: '/inventory', icon: <SpeedIcon /> },
         { text: 'Inventory List', path: '/inventory/list', icon: <InventoryIcon /> },
       ],
-      visible: true
+      roles: ['Inventory'] // Only show for Inventory role
+    },
+    {
+      id: 'manufacturing',
+      title: 'Manufacturing',
+      icon: <Factory />,
+      items: [
+        { text: 'Dashboard', path: '/manufacturing', icon: <SpeedIcon /> },
+        { text: 'Manufacturing List', path: '/manufacturing/list', icon: <Factory /> },
+      ],
+      roles: ['Manufacturing'] // Only show for Manufacturing role
+    },
+    {
+      id: 'environment',
+      title: 'Environment',
+      icon: <Nature />,
+      items: [
+        { text: 'Dashboard', path: '/environment', icon: <SpeedIcon /> },
+        { text: 'Environment List', path: '/environment/list', icon: <Nature /> },
+      ],
+      roles: ['Environment'] // Only show for Environment role
     }
   ];
 
@@ -296,18 +350,17 @@ const Navigation = () => {
         justifyContent: 'center',
         padding: theme.spacing(3, 2) 
       }}>
-        <StyledLogo 
-          variant="h5" 
-          component={Link} 
-          to="/"
-        >
-          DocControl
-        </StyledLogo>
+      <Link to="/">
+        <LogoImage src={logo} alt="Logo" />
+      </Link>
+
       </Box>
       
       <Divider sx={{ opacity: 0.1, mx: 2, mb: 3 }} />      
       <List sx={{ px: 1 }}>
-        {navigationSections.map((section) => (
+        {navigationSections
+          .filter(section => section.roles.includes(userRole)) // Only show sections for the user's role
+          .map((section) => (
           <React.Fragment key={section.id}>
             <StyledListItemButton 
               onClick={() => handleSectionToggle(section.id)}
@@ -427,13 +480,10 @@ const Navigation = () => {
             </IconButton>
             
             <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', flexGrow: 1 }}>
-              <StyledLogo 
-                variant="h5" 
-                component={Link} 
-                to="/"
-              >
-                DocControl
-              </StyledLogo>
+            <Link to="/">
+              <LogoImage src={logo} alt="Logo" />
+            </Link>
+
               
               {/* Role indicator */}
               {userRole && (
@@ -446,13 +496,10 @@ const Navigation = () => {
             </Box>
             
             <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
-              <StyledLogo 
-                variant="h5" 
-                component={Link}
-                to="/"
-              >
-                DocControl
-              </StyledLogo>
+            <Link to="/">
+              <LogoImage src={logo} alt="Logo" />
+            </Link>
+
             </Box>
             
             {/* Right section: notifications, search, and user menu */}
@@ -467,7 +514,7 @@ const Navigation = () => {
               {/* Notification Icon */}
               <Tooltip title="Notifications">
                 <HeaderIconButton color="inherit" size="medium">
-                  <Badge badgeContent={4} color="error">
+                  <Badge color="error">
                     <NotificationsIcon fontSize="small" />
                   </Badge>
                 </HeaderIconButton>
@@ -480,24 +527,6 @@ const Navigation = () => {
                 </HeaderIconButton>
               </Tooltip>
               
-              {/* User Avatar and Menu */}
-              <Tooltip title={`Logged in as ${userName}`}>
-                <IconButton
-                  onClick={handleMenu}
-                  color="inherit"
-                  sx={{ ml: 1 }}
-                >
-                  <StyledBadge
-                    overlap="circular"
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    variant="dot"
-                  >
-                    <StyledAvatar>
-                      {userName.charAt(0)}
-                    </StyledAvatar>
-                  </StyledBadge>
-                </IconButton>
-              </Tooltip>
               
               <Menu
                 id="menu-appbar"

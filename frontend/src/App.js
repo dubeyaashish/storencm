@@ -29,6 +29,8 @@ import DocumentForm         from './pages/DocumentForm';
 import DocumentView         from './pages/DocumentView';
 import Navigation           from './components/Navigation';
 import SectionHeader        from './components/SectionHeader';
+import ManufacturingDashboard from './pages/ManufacturingDashboard';
+import EnvironmentDashboard from './pages/EnvironmentDashboard';
 
 // Error boundary
 class ErrorBoundary extends React.Component {
@@ -202,6 +204,24 @@ function App() {
                   <ProtectedRoute
                     element={<DocumentView />}
                     allowedRoles={['SaleCo','QA','Inventory']}
+                  />
+                }
+              />
+              <Route
+                path="/manufacturing"
+                element={
+                  <ProtectedRoute
+                    element={<ManufacturingDashboard />}
+                    allowedRoles={['Manufacturing']}
+                  />
+                }
+              />
+              <Route
+                path="/environment"
+                element={
+                  <ProtectedRoute
+                    element={<EnvironmentDashboard />}
+                    allowedRoles={['Environment']}
                   />
                 }
               />

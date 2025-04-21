@@ -1,4 +1,4 @@
-// client/src/pages/InventoryDashboard.js
+// client/src/pages/EnvironmentDashboard.js
 import React, { useEffect, useState } from 'react';
 import {
   Box,
@@ -27,9 +27,7 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Button,
-  Tooltip,
-  useTheme,
-  alpha
+  Tooltip
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -38,8 +36,7 @@ import {
   ViewList as ViewListIcon,
   CheckCircle as CheckCircleIcon,
   CalendarToday as CalendarIcon,
-  LocalShipping as ShippingIcon,
-  Inventory as InventoryIcon
+  Nature as EnvironmentIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
@@ -50,15 +47,14 @@ const statusColors = {
   'Accepted by Inventory': 'info',
   'Accepted by QA': 'info',
   'Accepted by Both': 'success',
-  'In Progress': 'primary',
-  'Completed': 'success',
-  'Rejected': 'error',
   'Send to Manufacture': 'warning',
-  'Send to Environment': 'success'
+  'Send to Environment': 'success',
+  'Accepted by Environment': 'success',
+  'Completed': 'success',
+  'Rejected': 'error'
 };
 
-export default function InventoryDashboard() {
-  const theme = useTheme();
+export default function EnvironmentDashboard() {
   const [docs, setDocs] = useState([]);
   const [filteredDocs, setFilteredDocs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +63,12 @@ export default function InventoryDashboard() {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
   const [tabValue, setTabValue] = useState(0);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
-  const [stats, setStats] = useState({ total:0, created:0, accepted:0, completed:0, rejected:0 });
+  const [stats, setStats] = useState({ 
+    total: 0, 
+    waiting: 0, 
+    accepted: 0, 
+    completed: 0
+  });
 
   // Install axios interceptors once
   useEffect(() => {
@@ -95,26 +96,32 @@ export default function InventoryDashboard() {
 
   // Update stats when docs change
   useEffect(() => {
-    const total    = docs.length;
-    const created  = docs.filter(d => d.status === 'Created').length;
-    const accepted = docs.filter(d => d.status.startsWith('Accepted')).length;
-    const completed = docs.filter(d => d.status === 'Completed' || 
-                                      d.status === 'Send to Manufacture' || 
-                                      d.status === 'Send to Environment').length;
-    const rejected = docs.filter(d => d.status === 'Rejected').length;
-    setStats({ total, created, accepted, completed, rejected });
+    const total = docs.length;
+    const waiting = docs.filter(d => d.status === 'Send to Environment').length;
+    const accepted = docs.filter(d => d.status === 'Accepted by Environment').length;
+    const completed = docs.filter(d => d.status === 'Completed').length;
+    
+    setStats({ total, waiting, accepted, completed });
   }, [docs]);
 
   // Filter documents on search or tab change
   useEffect(() => {
     let fd = [...docs];
+    // Only show documents sent to environment
+    fd = fd.filter(d => 
+      d.status === 'Send to Environment' || 
+      d.status === 'Accepted by Environment' || 
+      d.status === 'Completed'
+    );
+    
     if (tabValue === 1) {
-      fd = fd.filter(d => d.status === 'Created');
+      fd = fd.filter(d => d.status === 'Send to Environment');
     } else if (tabValue === 2) {
-      fd = fd.filter(d => d.status.startsWith('Accepted'));
+      fd = fd.filter(d => d.status === 'Accepted by Environment');
     } else if (tabValue === 3) {
-      fd = fd.filter(d => ['Completed', 'Rejected', 'Send to Manufacture', 'Send to Environment'].includes(d.status));
+      fd = fd.filter(d => d.status === 'Completed');
     }
+    
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       fd = fd.filter(d =>
@@ -160,34 +167,43 @@ export default function InventoryDashboard() {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
 
-  // Handle inventory accept
+  // Handle Environment accept
   const handleAccept = async (doc) => {
-    if (!window.confirm('Accept this document?')) return;
+    if (!window.confirm('Accept this document for environmental assessment?')) return;
     try {
-      await axios.post(`/api/documents/${doc.id}/accept-inventory`);
+      // The endpoint would need to be created on the backend
+      await axios.post(`/api/documents/${doc.id}/accept-environment`);
+      
+      // Update state locally until backend endpoint is available
       setDocs(docs.map(d => {
         if (d.id !== doc.id) return d;
-        const newStatus = d.status === 'Accepted by QA'
-          ? 'Accepted by Both'
-          : 'Accepted by Inventory';
         return {
           ...d,
-          status: newStatus,
-          InventoryName: localStorage.getItem('userName') || 'Inventory',
-          InventoryTimeStamp: new Date().toISOString()
+          status: 'Accepted by Environment',
+          EnvironmentName: localStorage.getItem('userName') || 'Environment',
+          EnvironmentTimeStamp: new Date().toISOString()
         };
       }));
-      setNotification({ open: true, message: 'Accepted successfully', severity: 'success' });
+      
+      setNotification({ 
+        open: true, 
+        message: 'Document accepted for environmental assessment', 
+        severity: 'success' 
+      });
     } catch (err) {
-      console.error('Error accepting:', err);
-      setNotification({ open: true, message: err.response?.data?.message || 'Accept failed', severity: 'error' });
+      console.error('Error accepting for environment:', err);
+      setNotification({ 
+        open: true, 
+        message: err.response?.data?.message || 'Accept failed', 
+        severity: 'error' 
+      });
     }
   };
 
   if (loading) {
     return (
       <Box sx={{ p:3, textAlign:'center' }}>
-        <Typography variant="h4">Inventory Dashboard</Typography>
+        <Typography variant="h4">Environment Dashboard</Typography>
         <CircularProgress sx={{ mt:2 }} />
       </Box>
     );
@@ -197,7 +213,7 @@ export default function InventoryDashboard() {
     <Box sx={{ p:3 }}>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
-        <Typography variant="h4">Inventory Dashboard</Typography>
+        <Typography variant="h4">Environment Dashboard</Typography>
         <Box display="flex" alignItems="center" gap={2}>
           <TextField
             placeholder="Search..."
@@ -225,81 +241,42 @@ export default function InventoryDashboard() {
       </Box>
 
       {/* Stats */}
-{/* Stats - Fixed version with forced visibility */}
-<Grid container spacing={2} mb={3}>
-  {[
-    ['Total', stats.total, '#2196f3', '#e3f2fd'],
-    ['Created', stats.created, '#ff9800', '#fff3e0'],
-    ['Accepted', stats.accepted, '#9c27b0', '#f3e5f5'],
-    ['Completed', stats.completed, '#4caf50', '#e8f5e9'],
-    ['Rejected', stats.rejected, '#f44336', '#ffebee']
-  ].map(([label, value, textColor, bgColor]) => (
-    <Grid item xs={6} md={2.4} key={label}>
-      <Card
-        elevation={3}
-        sx={{
-          backgroundColor: theme.palette.mode === 'dark' 
-            ? alpha(textColor, 0.2)  // Darker theme: use semi-transparent color
-            : bgColor,               // Light theme: use light background
-          border: `1px solid ${textColor}`,
-          boxShadow: `0 2px 8px rgba(0, 0, 0, 0.1)`,
-          transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-          overflow: 'hidden',
-          position: 'relative',
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: `0 4px 12px rgba(0, 0, 0, 0.15)`,
-          },
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '4px',
-            height: '100%',
-            backgroundColor: textColor,
-          }
-        }}
-      >
-        <CardContent sx={{ py: 1.5, textAlign: 'center' }}>
-          <Typography 
-            variant="h4" 
-            sx={{ 
-              fontWeight: 'bold', 
-              color: textColor,
-              textShadow: theme.palette.mode === 'dark' 
-                ? '0 0 10px rgba(0,0,0,0.5)' 
-                : 'none'
-            }}
-          >
-            {value}
-          </Typography>
-          <Typography 
-            variant="body2" 
-            sx={{ 
-              color: textColor,
-              opacity: 0.8,
-              fontWeight: 500
-            }}
-          >
-            {label}
-          </Typography>
-        </CardContent>
-      </Card>
-    </Grid>
-  ))}
-</Grid>
+      <Grid container spacing={2} mb={3}>
+        {[
+          ['Total', stats.total],
+          ['Waiting', stats.waiting],
+          ['Accepted', stats.accepted],
+          ['Completed', stats.completed]
+        ].map(([label, value]) => (
+          <Grid item xs={6} md={3} key={label}>
+            <Card sx={{ 
+              bgcolor: theme => theme.palette.mode === 'dark' ? '#1e2a3a' : '#f5f5f5',
+              boxShadow: 2,
+              border: theme => `1px solid ${theme.palette.divider}`
+            }}>
+              <CardContent sx={{ py:2, textAlign:'center' }}>
+                <Typography variant="h4" color="primary" fontWeight="bold">{value}</Typography>
+                <Typography variant="body1" color="text.primary" fontWeight="medium">{label}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
 
       {/* Tabs */}
       <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ mb:2 }}>
         <Tab label="All" />
-        <Tab label="Created" />
+        <Tab label="Waiting" />
         <Tab label="Accepted" />
-        <Tab label="Completed/Rejected" />
+        <Tab label="Completed" />
       </Tabs>
 
       {error && <Alert severity="error" sx={{ my:2 }}>{error}</Alert>}
-      {!error && !filteredDocs.length && <Alert severity="info">No documents found.</Alert>}
+      {!error && !filteredDocs.length && (
+        <Alert severity="info">
+          No documents found. Environment dashboards will only show documents that have been sent to environment.
+        </Alert>
+      )}
 
       {/* Table View */}
       {viewMode === 'table' && filteredDocs.length > 0 && (
@@ -333,12 +310,13 @@ export default function InventoryDashboard() {
                         <VisibilityIcon/>
                       </IconButton>
                     </Tooltip>
-                    {doc.status === 'Created' && (
+                    {doc.status === 'Send to Environment' && (
                       <Tooltip title="Accept document">
                         <Button
                           size="small"
                           startIcon={<CheckCircleIcon />}
                           onClick={() => handleAccept(doc)}
+                          color="success"
                         >
                           Accept
                         </Button>
@@ -394,7 +372,7 @@ export default function InventoryDashboard() {
                   </Typography>
                   
                   <Box display="flex" alignItems="center" mt={1}>
-                    <InventoryIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                    <EnvironmentIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
                     <Typography variant="body2" gutterBottom>
                       <strong>Lot No:</strong> {doc.Lot_No || 'N/A'}
                     </Typography>
@@ -414,33 +392,15 @@ export default function InventoryDashboard() {
                     <strong>Issue Found:</strong> {truncateText(doc.Issue_Found, 50) || 'N/A'}
                   </Typography>
                   
-                  <Tooltip title={doc.Issue_Description || 'No description'}>
-                    <Typography variant="body2" gutterBottom sx={{ cursor: 'help' }}>
-                      <strong>Issue Description:</strong> {truncateText(doc.Issue_Description, 70) || 'N/A'}
-                    </Typography>
-                  </Tooltip>
-                  
                   <Typography variant="body2" gutterBottom>
-                    <strong>Foundee:</strong> {doc.Foundee || 'N/A'}
-                  </Typography>
-                  
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Department:</strong> {doc.Department || 'N/A'}
+                    <strong>QA Solution:</strong> {truncateText(doc.QASolution, 50) || 'N/A'}
                   </Typography>
                   
                   {/* QA info if available */}
                   {doc.QAName && (
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      <strong>QA Accepted:</strong> {doc.QAName} 
+                      <strong>QA Review By:</strong> {doc.QAName} 
                       {doc.QATimeStamp && ` (${formatDate(doc.QATimeStamp)})`}
-                    </Typography>
-                  )}
-                  
-                  {/* Inventory info if available */}
-                  {doc.InventoryName && (
-                    <Typography variant="body2" color="text.secondary">
-                      <strong>Inventory Accepted:</strong> {doc.InventoryName}
-                      {doc.InventoryTimeStamp && ` (${formatDate(doc.InventoryTimeStamp)})`}
                     </Typography>
                   )}
                 </CardContent>
@@ -448,10 +408,10 @@ export default function InventoryDashboard() {
                   <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
                     <VisibilityIcon/>
                   </IconButton>
-                  {doc.status === 'Created' && (
+                  {doc.status === 'Send to Environment' && (
                     <Button
                       variant="contained" 
-                      color="primary"
+                      color="success"
                       size="small"
                       startIcon={<CheckCircleIcon/>}
                       onClick={() => handleAccept(doc)}

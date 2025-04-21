@@ -15,24 +15,31 @@ import {
   TextField,
   InputAdornment,
   IconButton,
-  Snackbar
+  Snackbar,
+  Tooltip
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Add as AddIcon,
   Search as SearchIcon,
   Visibility as VisibilityIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  CalendarToday as CalendarIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
 // Status chip color mapping
 const statusColors = {
-  'Inform NC': 'warning',
-  'Accepted': 'info',
+  'Created': 'warning',
+  'Accepted by Inventory': 'info',
+  'Accepted by QA': 'info',
+  'Accepted by Both': 'success',
   'In Progress': 'primary',
   'Completed': 'success',
-  'Rejected': 'error'
+  'Rejected': 'error',
+  'Send to Manufacture': 'warning',
+  'Send to Environment': 'success'
 };
 
 const SaleCoDashboard = () => {
@@ -55,10 +62,12 @@ const SaleCoDashboard = () => {
     } else {
       const term = searchTerm.toLowerCase();
       const filtered = docs.filter(doc => 
-        doc.documentNumber?.toLowerCase().includes(term) ||
-        doc.productType?.toLowerCase().includes(term) ||
-        doc.status?.toLowerCase().includes(term) ||
-        doc.issueFound?.toLowerCase().includes(term)
+        (doc.Document_id?.toLowerCase().includes(term)) ||
+        (doc.Product_id?.toString().includes(term)) ||
+        (doc.status?.toLowerCase().includes(term)) ||
+        (doc.Issue_Found?.toLowerCase().includes(term)) ||
+        (doc.Description?.toLowerCase().includes(term)) ||
+        (doc.Lot_No?.toLowerCase().includes(term))
       );
       setFilteredDocs(filtered);
     }
@@ -137,6 +146,23 @@ const SaleCoDashboard = () => {
     }
   };
 
+  // Format date function
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric'
+    });
+  };
+
+  // Truncate text for display
+  const truncateText = (text, maxLength = 100) => {
+    if (!text) return "N/A";
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
   // Handle search input change
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -167,6 +193,7 @@ const SaleCoDashboard = () => {
         alignItems="center"
         flexWrap="wrap"
         gap={2}
+        mb={3}
       >
         <Typography variant="h5">Documents</Typography>
         
@@ -203,7 +230,7 @@ const SaleCoDashboard = () => {
       )}
 
       {/* Documents grid */}
-      <Grid container spacing={2} sx={{ mt: 2 }}>
+      <Grid container spacing={2}>
         {filteredDocs.map((doc) => (
           <Grid item xs={12} md={6} lg={4} key={doc.id}>
             <Card 
@@ -211,7 +238,7 @@ const SaleCoDashboard = () => {
                 height: '100%', 
                 display: 'flex', 
                 flexDirection: 'column',
-                transition: 'transform 0.2s ease-in-out',
+                transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
                 '&:hover': {
                   transform: 'translateY(-5px)',
                   boxShadow: 3
@@ -219,8 +246,10 @@ const SaleCoDashboard = () => {
               }}
             >
               <CardContent sx={{ flexGrow: 1 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                  <Typography variant="h6" gutterBottom>{doc.documentNumber || `Document #${doc.id}`}</Typography>
+                <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                  <Typography variant="h6" component="div">
+                    {doc.Document_id || `Document #${doc.id}`}
+                  </Typography>
                   <Chip 
                     label={doc.status} 
                     color={statusColors[doc.status] || 'default'} 
@@ -228,42 +257,93 @@ const SaleCoDashboard = () => {
                   />
                 </Box>
                 
+                <Box display="flex" alignItems="center" mb={1}>
+                  <CalendarIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    {formatDate(doc.date)}
+                  </Typography>
+                </Box>
+                
                 <Divider sx={{ my: 1 }} />
                 
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>Product:</strong> {doc.productType}
+                <Typography variant="body2" gutterBottom>
+                  <strong>Product ID:</strong> {doc.Product_id || 'N/A'}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>Lot No:</strong> {doc.lotNo}
+                
+                <Typography variant="body2" gutterBottom>
+                  <strong>Lot No:</strong> {doc.Lot_No || 'N/A'}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>Issue:</strong> {doc.issueFound}
+                
+                <Typography variant="body2" gutterBottom>
+                  <strong>Size:</strong> {doc.Product_size || 'N/A'}
                 </Typography>
-                {doc.qaName && (
+                
+                <Typography variant="body2" gutterBottom>
+                  <strong>Quantity:</strong> {doc.Quantity || 'N/A'}
+                </Typography>
+                
+                <Divider sx={{ my: 1 }} />
+                
+                <Typography variant="body2" gutterBottom>
+                  <strong>Issue:</strong> {truncateText(doc.Issue_Found, 50) || 'N/A'}
+                </Typography>
+                
+                <Tooltip title={doc.Issue_Description || 'No description'}>
+                  <Typography variant="body2" gutterBottom sx={{ cursor: 'help' }}>
+                    <strong>Issue Description:</strong> {truncateText(doc.Issue_Description, 70) || 'N/A'}
+                  </Typography>
+                </Tooltip>
+                
+                <Typography variant="body2" gutterBottom>
+                  <strong>Foundee:</strong> {doc.Foundee || 'N/A'}
+                </Typography>
+                
+                <Typography variant="body2" gutterBottom>
+                  <strong>Department:</strong> {doc.Department || 'N/A'}
+                </Typography>
+                
+                {doc.QAName && (
+                  <>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>QA Accepted By:</strong> {doc.QAName} 
+                      {doc.QATimeStamp && ` (${formatDate(doc.QATimeStamp)})`}
+                    </Typography>
+                  </>
+                )}
+                
+                {doc.InventoryName && (
                   <Typography variant="body2" color="text.secondary">
-                    <strong>QA:</strong> {doc.qaName}
+                    <strong>Inventory Accepted By:</strong> {doc.InventoryName}
+                    {doc.InventoryTimeStamp && ` (${formatDate(doc.InventoryTimeStamp)})`}
                   </Typography>
                 )}
               </CardContent>
               
               <CardActions sx={{ justifyContent: 'flex-end', p: 1 }}>
-                <IconButton 
-                  size="small" 
-                  component={RouterLink} 
-                  to={`/saleco/view/${doc.Document_id}`}
-                  title="View details"
-                >
-                  <VisibilityIcon fontSize="small" />
-                </IconButton>
-                <IconButton 
-                  size="small" 
-                  onClick={() => handleDelete(doc.id)}
-                  title="Delete document"
-                  color="error"
-                  disabled={doc.status !== 'Inform NC'}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
+                <Tooltip title="View details">
+                  <IconButton 
+                    size="small" 
+                    component={RouterLink} 
+                    to={`/saleco/view/${doc.Document_id}`}
+                    color="primary"
+                  >
+                    <VisibilityIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                
+                <Tooltip title="Delete document">
+                  <span>
+                    <IconButton 
+                      size="small" 
+                      onClick={() => handleDelete(doc.id)}
+                      color="error"
+                      disabled={doc.status !== 'Created'}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </CardActions>
             </Card>
           </Grid>

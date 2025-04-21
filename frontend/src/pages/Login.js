@@ -17,7 +17,7 @@ import { LockOutlined, PersonAdd } from '@mui/icons-material';
 import axios from 'axios';
 
 // Make sure all three roles appear here:
-const roles = ['SaleCo', 'Inventory', 'QA'];
+const roles = ['SaleCo', 'Inventory', 'QA', 'Manufacturing', 'Environment'];
 
 export default function StyledLogin() {
   const [tab, setTab] = useState(0);
@@ -55,8 +55,17 @@ export default function StyledLogin() {
         email: loginEmail,
         password: loginPassword
       });
+      
+      // Store token and role
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.role);
+      
+      // Store user data
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('userName', data.user.name); // Also store name directly for compatibility
+      }
+      
       window.location.href = `/${data.role.toLowerCase()}`;
     } catch (err) {
       setMessage(err.response?.data?.message || 'Login failed');
