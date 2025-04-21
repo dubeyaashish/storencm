@@ -1,11 +1,11 @@
 // client/src/pages/QADashboard.js
 import React, { useEffect, useState } from 'react';
 import {
-  Box, 
-  Typography, 
-  Button, 
-  Grid, 
-  Card, 
+  Box,
+  Typography,
+  Button,
+  Grid,
+  Card,
   CardContent,
   CardActions,
   Chip,
@@ -21,475 +21,359 @@ import {
   DialogActions,
   Tabs,
   Tab,
-  Snackbar
+  Snackbar,
+  ToggleButtonGroup,
+  ToggleButton,
+  TableContainer,
+  Paper,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Visibility as VisibilityIcon
+  Visibility as VisibilityIcon,
+  GridView as GridViewIcon,
+  ViewList as ViewListIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
 
 // Status chip color mapping
 const statusColors = {
-  'Inform NC': 'warning',
-  'Accepted': 'info',
-  'In Progress': 'primary',
+  'Created': 'warning',
+  'Accepted by Inventory': 'info',
+  'Accepted by QA': 'info',
+  'Accepted by Both': 'success',
   'Completed': 'success',
   'Rejected': 'error'
 };
 
-const QADashboard = () => {
+export default function QADashboard() {
   const [docs, setDocs] = useState([]);
   const [filteredDocs, setFilteredDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [tabValue, setTabValue] = useState(0);
+  const [viewMode, setViewMode] = useState('grid');
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
-  
-  // QA Assessment dialog state
+
+  // Dialog & form
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentDoc, setCurrentDoc] = useState(null);
-  const [assessmentForm, setAssessmentForm] = useState({
-    solutions: '',
-    comments: '',
-    people1: '',
-    people2: '',
-    damageCost: '',
-    dept: ''
+  const [form, setForm] = useState({
+    QASolution: '',
+    QASolutionDescription: '',
+    Person1: '',
+    Person2: '',
+    DamageCost: '',
+    DepartmentExpense: ''
   });
 
-  // Fetch documents on component mount
+  // 1) Interceptors
   useEffect(() => {
-    fetchDocuments();
+    axios.interceptors.request.use(cfg => {
+      const t = localStorage.getItem('token');
+      if (t) cfg.headers.Authorization = `Bearer ${t}`;
+      return cfg;
+    });
+    axios.interceptors.response.use(
+      res => res,
+      err => {
+        if (err.response?.status === 401) {
+          localStorage.clear();
+          window.location.href = '/login';
+        }
+        return Promise.reject(err);
+      }
+    );
   }, []);
 
-  // Filter documents when search term or tab changes
+  // 2) Fetch on mount
   useEffect(() => {
-    if (!docs.length) {
-      setFilteredDocs([]);
-      return;
-    }
-    
-    let filtered = [...docs];
-    
-    // Filter by tab value (status)
-    if (tabValue === 0) {
-      // All documents
-    } else if (tabValue === 1) {
-      // Pending (Inform NC)
-      filtered = filtered.filter(doc => doc.status === 'Inform NC');
-    } else if (tabValue === 2) {
-      // Accepted
-      filtered = filtered.filter(doc => doc.status === 'Accepted');
-    } else if (tabValue === 3) {
-      // Completed
-      filtered = filtered.filter(doc => 
-        doc.status === 'Completed' || doc.status === 'Rejected'
-      );
-    }
-    
-    // Then filter by search term
-    if (searchTerm.trim() !== '') {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(doc => 
-        doc.documentNumber?.toLowerCase().includes(term) ||
-        doc.productType?.toLowerCase().includes(term) ||
-        doc.issueFound?.toLowerCase().includes(term)
-      );
-    }
-    
-    setFilteredDocs(filtered);
-  }, [searchTerm, tabValue, docs]);
+    fetchDocs();
+  }, []);
 
-  // Fetch documents from API
-  const fetchDocuments = async () => {
+  async function fetchDocs() {
     setLoading(true);
     setError('');
-    
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Authentication required. Please log in.');
-        setLoading(false);
-        return;
-      }
-      
-      const response = await axios.get('/api/documents/list', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setDocs(response.data);
+      const { data } = await axios.get('/api/documents/list');
+      setDocs(data);
     } catch (err) {
-      console.error('Error fetching documents:', err);
-      
-      if (err.response) {
-        if (err.response.status === 401) {
-          setError('Authentication error. Please log in again.');
-        } else {
-          setError(err.response.data.message || 'Error fetching documents');
-        }
-      } else if (err.request) {
-        setError('No response from server. Please check your connection.');
-      } else {
-        setError('Error fetching documents. Please try again later.');
-      }
+      console.error(err);
+      setError(err.response?.data?.message || 'Error loading documents');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  // Handle tab change
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
+  // 3) Filter & tabs
+  useEffect(() => {
+    let fd = [...docs];
+    if (tabValue === 1) {
+      fd = fd.filter(d => d.status === 'Created');
+    } else if (tabValue === 2) {
+      fd = fd.filter(d => d.status.startsWith('Accepted'));
+    } else if (tabValue === 3) {
+      fd = fd.filter(d => d.status === 'Completed' || d.status === 'Rejected');
+    }
+    if (searchTerm) {
+      const t = searchTerm.toLowerCase();
+      fd = fd.filter(d =>
+        d.Document_id.toLowerCase().includes(t) ||
+        d.Product_id.toString().includes(t) ||
+        d.Issue_Found.toLowerCase().includes(t)
+      );
+    }
+    setFilteredDocs(fd);
+  }, [docs, tabValue, searchTerm]);
 
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  // Handle accepting a document
-  const handleAccept = (doc) => {
+  const openDialog = doc => {
     setCurrentDoc(doc);
+    setForm({
+      QASolution: '',
+      QASolutionDescription: '',
+      Person1: '',
+      Person2: '',
+      DamageCost: '',
+      DepartmentExpense: ''
+    });
     setDialogOpen(true);
   };
 
-  // Handle assessment form change
-  const handleAssessmentChange = (e) => {
+  const handleFormChange = e => {
     const { name, value } = e.target;
-    setAssessmentForm({ ...assessmentForm, [name]: value });
+    setForm(f => ({ ...f, [name]: value }));
   };
 
-  // Handle assessment form submission
-  const handleAssessmentSubmit = async () => {
+  const handleSubmit = async () => {
     if (!currentDoc) return;
-    
     try {
-      const token = localStorage.getItem('token');
-      const userData = JSON.parse(localStorage.getItem('user') || '{}');
-      const qaName = userData.name || 'QA User';
-      
-      // First, accept the document
-      await axios.post('/api/documents/accept', 
-        { id: currentDoc.id, qaName }, 
-        { headers: { Authorization: `Bearer ${token}` } }
+      // 1) accept QA
+      await axios.post(`/api/documents/${currentDoc.id}/accept-qa`);
+      // 2) update details & status
+      const newStatus = currentDoc.status === 'Accepted by Inventory'
+        ? 'Accepted by Both'
+        : 'Accepted by QA';
+      await axios.put(
+        `/api/documents/${currentDoc.id}/qa-details`,
+        { ...form, status: newStatus }
       );
-      
-      // Then update with assessment details
-      await axios.put(`/api/documents/${currentDoc.id}`,
-        { 
-          ...assessmentForm,
-          status: 'Accepted' 
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      // Update local state
-      const updatedDocs = docs.map(d => {
-        if (d.id === currentDoc.id) {
-          return { 
-            ...d, 
-            ...assessmentForm,
-            status: 'Accepted',
-            qaName
-          };
-        }
-        return d;
-      });
-      
-      setDocs(updatedDocs);
-      
-      // Show success notification
-      setNotification({
-        open: true,
-        message: 'Document accepted successfully',
-        severity: 'success'
-      });
-      
-      // Close dialog
+      // 3) update UI
+      setDocs(docs.map(d => {
+        if (d.id !== currentDoc.id) return d;
+        return {
+          ...d,
+          ...form,
+          status: newStatus,
+          QAName: localStorage.getItem('userName') || 'QA',
+          QATimeStamp: new Date().toISOString()
+        };
+      }));
+      setNotification({ open: true, message: 'QA saved', severity: 'success' });
       setDialogOpen(false);
-      
-      // Reset form
-      setAssessmentForm({
-        solutions: '',
-        comments: '',
-        people1: '',
-        people2: '',
-        damageCost: '',
-        dept: ''
-      });
-      
     } catch (err) {
-      console.error('Error accepting document:', err);
-      
-      // Show error notification
-      setNotification({
-        open: true,
-        message: err.response?.data?.message || 'Error accepting document',
-        severity: 'error'
-      });
+      console.error(err);
+      setNotification({ open: true, message: err.response?.data?.message || 'Error', severity: 'error' });
     }
   };
 
-  // Close notification
-  const handleCloseNotification = () => {
-    setNotification({ ...notification, open: false });
-  };
-
-  // Close dialog
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-  };
-
-  // Render loading state
   if (loading) {
     return (
-      <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Typography variant="h4" gutterBottom>QA Dashboard</Typography>
-        <CircularProgress sx={{ mt: 4 }} />
-        <Typography variant="body1" sx={{ mt: 2 }}>Loading documents...</Typography>
+      <Box sx={{ p:3, textAlign:'center' }}>
+        <Typography variant="h4">QA Dashboard</Typography>
+        <CircularProgress sx={{ mt:2 }}/>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header with search */}
-      <Box 
-        display="flex" 
-        justifyContent="space-between" 
-        alignItems="center"
-        flexWrap="wrap"
-        gap={2}
-        mb={2}
-      >
+    <Box sx={{ p:3 }}>
+      {/* Header */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
         <Typography variant="h4">QA Dashboard</Typography>
-        
         <TextField
-          placeholder="Search documents..."
+          placeholder="Search..."
           size="small"
           value={searchTerm}
-          onChange={handleSearchChange}
-          sx={{ minWidth: 200 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            )
-          }}
+          onChange={e => setSearchTerm(e.target.value)}
+          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon/></InputAdornment> }}
         />
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(_,v)=>v&&setViewMode(v)}
+          size="small"
+        >
+          <ToggleButton value="grid"><GridViewIcon/></ToggleButton>
+          <ToggleButton value="table"><ViewListIcon/></ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
-      {/* Status tabs */}
-      <Tabs 
-        value={tabValue} 
-        onChange={handleTabChange} 
-        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
-      >
-        <Tab label="All Documents" />
-        <Tab label="Pending" />
+      {/* Tabs */}
+      <Tabs value={tabValue} onChange={(_,v)=>setTabValue(v)} sx={{ mb:2 }}>
+        <Tab label="All" />
+        <Tab label="Created" />
         <Tab label="Accepted" />
         <Tab label="Completed" />
       </Tabs>
 
-      {/* Error message */}
-      {error && (
-        <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
-          {error}
-        </Alert>
+      {error && <Alert severity="error" sx={{ mb:2 }}>{error}</Alert>}
+      {!error && !filteredDocs.length && <Alert severity="info">No documents.</Alert>}
+
+      {/* Grid */}
+      {viewMode==='grid' ? (
+        <Grid container spacing={2}>
+          {filteredDocs.map(doc=>(
+            <Grid item xs={12} md={6} lg={4} key={doc.id}>
+              <Card sx={{ display:'flex', flexDirection:'column', height:'100%' }}>
+                <CardContent sx={{ flexGrow:1 }}>
+                  <Box display="flex" justifyContent="space-between">
+                    <Typography variant="h6">{doc.Document_id}</Typography>
+                    <Chip label={doc.status} color={statusColors[doc.status]}/>
+                  </Box>
+                  <Divider sx={{ my:1 }}/>
+                  <Typography><strong>Product:</strong> {doc.Product_id}</Typography>
+                  <Typography><strong>Issue:</strong> {doc.Issue_Found}</Typography>
+                </CardContent>
+                <CardActions>
+                  <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
+                    <VisibilityIcon/>
+                  </IconButton>
+                  {(doc.status==='Created' || doc.status==='Accepted by Inventory') && (
+                    <Button
+                      startIcon={<CheckCircleIcon/>}
+                      onClick={()=>openDialog(doc)}
+                    >
+                      Accept
+                    </Button>
+                  )}
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      ) : (
+        // Table View
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Doc #</TableCell>
+                <TableCell>Product ID</TableCell>
+                <TableCell>Issue</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredDocs.map(doc=>(
+                <TableRow key={doc.id} hover>
+                  <TableCell>{doc.Document_id}</TableCell>
+                  <TableCell>{doc.Product_id}</TableCell>
+                  <TableCell>{doc.Issue_Found}</TableCell>
+                  <TableCell><Chip label={doc.status} color={statusColors[doc.status]}/></TableCell>
+                  <TableCell>
+                    <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
+                      <VisibilityIcon/>
+                    </IconButton>
+                    {(doc.status==='Created' || doc.status==='Accepted by Inventory') && (
+                      <IconButton onClick={()=>openDialog(doc)} color="primary">
+                        <CheckCircleIcon/>
+                      </IconButton>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
 
-      {/* No documents message */}
-      {!error && filteredDocs.length === 0 && (
-        <Alert severity="info" sx={{ mt: 2 }}>
-          {searchTerm ? 'No documents match your search.' : 'No documents found in this category.'}
-        </Alert>
-      )}
-
-      {/* Documents grid */}
-      <Grid container spacing={2}>
-        {filteredDocs.map((doc) => (
-          <Grid item xs={12} md={6} lg={4} key={doc.id}>
-            <Card 
-              sx={{ 
-                height: '100%', 
-                display: 'flex', 
-                flexDirection: 'column',
-                transition: 'transform 0.2s ease-in-out',
-                '&:hover': {
-                  transform: 'translateY(-5px)',
-                  boxShadow: 3
-                }
-              }}
-            >
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                  <Typography variant="h6" gutterBottom>{doc.documentNumber || `Document #${doc.id}`}</Typography>
-                  <Chip 
-                    label={doc.status} 
-                    color={statusColors[doc.status] || 'default'} 
-                    size="small"
-                  />
-                </Box>
-                
-                <Divider sx={{ my: 1 }} />
-                
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>Product:</strong> {doc.productType}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>Lot No:</strong> {doc.lotNo}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>Issue:</strong> {doc.issueFound}
-                </Typography>
-                {doc.qaName && (
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>QA:</strong> {doc.qaName}
-                  </Typography>
-                )}
-              </CardContent>
-              
-              <CardActions sx={{ justifyContent: 'flex-end', p: 1 }}>
-                <IconButton 
-                  size="small" 
-                  component={RouterLink} 
-                  to={`/qa/view/${doc.id}`}
-                  title="View details"
-                >
-                  <VisibilityIcon fontSize="small" />
-                </IconButton>
-                
-                {doc.status === 'Inform NC' && (
-                  <Button 
-                    size="small" 
-                    startIcon={<CheckCircleIcon />}
-                    color="primary"
-                    onClick={() => handleAccept(doc)}
-                  >
-                    Accept
-                  </Button>
-                )}
-                
-                {doc.status === 'Accepted' && (
-                  <Button 
-                    size="small" 
-                    startIcon={<CheckCircleIcon />}
-                    color="success"
-                    onClick={() => {
-                      // Implement complete functionality
-                    }}
-                  >
-                    Complete
-                  </Button>
-                )}
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-      
-      {/* QA Assessment Dialog */}
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+      {/* Dialog */}
+      <Dialog open={dialogOpen} onClose={()=>setDialogOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>QA Assessment</DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
+          <Grid container spacing={2} sx={{ mt:1 }}>
             <Grid item xs={12}>
               <TextField
-                label="Solutions"
-                name="solutions"
+                label="Solution Title"
+                name="QASolution"
+                fullWidth
+                value={form.QASolution}
+                onChange={handleFormChange}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                label="Solution Details"
+                name="QASolutionDescription"
                 multiline
                 rows={3}
                 fullWidth
-                value={assessmentForm.solutions}
-                onChange={handleAssessmentChange}
+                value={form.QASolutionDescription}
+                onChange={handleFormChange}
               />
             </Grid>
-            
-            <Grid item xs={12}>
-              <TextField
-                label="Comments"
-                name="comments"
-                multiline
-                rows={3}
-                fullWidth
-                value={assessmentForm.comments}
-                onChange={handleAssessmentChange}
-              />
-            </Grid>
-            
             <Grid item xs={12} md={6}>
               <TextField
-                label="Person Responsible 1"
-                name="people1"
+                label="Person 1"
+                name="Person1"
                 fullWidth
-                value={assessmentForm.people1}
-                onChange={handleAssessmentChange}
+                value={form.Person1}
+                onChange={handleFormChange}
               />
             </Grid>
-            
             <Grid item xs={12} md={6}>
               <TextField
-                label="Person Responsible 2"
-                name="people2"
+                label="Person 2"
+                name="Person2"
                 fullWidth
-                value={assessmentForm.people2}
-                onChange={handleAssessmentChange}
+                value={form.Person2}
+                onChange={handleFormChange}
               />
             </Grid>
-            
             <Grid item xs={12} md={6}>
               <TextField
                 label="Damage Cost"
-                name="damageCost"
+                name="DamageCost"
                 type="number"
                 fullWidth
-                value={assessmentForm.damageCost}
-                onChange={handleAssessmentChange}
-                InputProps={{ inputProps: { min: 0, step: 0.01 } }}
+                value={form.DamageCost}
+                onChange={handleFormChange}
               />
             </Grid>
-            
             <Grid item xs={12} md={6}>
               <TextField
-                label="Department"
-                name="dept"
+                label="Dept Expense"
+                name="DepartmentExpense"
+                type="number"
                 fullWidth
-                value={assessmentForm.dept}
-                onChange={handleAssessmentChange}
+                value={form.DepartmentExpense}
+                onChange={handleFormChange}
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleAssessmentSubmit} color="primary" variant="contained">
-            Accept & Save
-          </Button>
+          <Button onClick={()=>setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained">Save & Accept</Button>
         </DialogActions>
       </Dialog>
-      
-      {/* Notification */}
+
+      {/* Snackbar */}
       <Snackbar
         open={notification.open}
         autoHideDuration={6000}
-        onClose={handleCloseNotification}
+        onClose={()=>setNotification(n=>({...n,open:false}))}
       >
-        <Alert 
-          onClose={handleCloseNotification} 
-          severity={notification.severity} 
-          sx={{ width: '100%' }}
-        >
-          {notification.message}
-        </Alert>
+        <Alert severity={notification.severity}>{notification.message}</Alert>
       </Snackbar>
     </Box>
   );
-};
-
-export default QADashboard;
+}

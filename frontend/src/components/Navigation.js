@@ -305,22 +305,7 @@ const Navigation = () => {
         </StyledLogo>
       </Box>
       
-      <Divider sx={{ opacity: 0.1, mx: 2, mb: 3 }} />
-      
-      <Box sx={{ px: 3, mb: 4 }}>
-        <ActionButton 
-          variant="contained" 
-          fullWidth 
-          startIcon={<AddIcon />}
-          component={Link}
-          to="/saleco/create"
-          size="large"
-          sx={{ py: 1 }}
-        >
-          New Document
-        </ActionButton>
-      </Box>
-      
+      <Divider sx={{ opacity: 0.1, mx: 2, mb: 3 }} />      
       <List sx={{ px: 1 }}>
         {navigationSections.map((section) => (
           <React.Fragment key={section.id}>

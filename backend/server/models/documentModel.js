@@ -1,9 +1,8 @@
-// server/models/documentModel.js
 const db = require('../config/db');
 
 /**
  * Create a new document
- * @param {Object} documentData - Document data from form
+ * @param {Object} documentData - Document data from controller (includes Document_id, status, createdBy, etc)
  * @param {Function} callback - Callback function(err, result)
  */
 const createDocument = (documentData, callback) => {
@@ -13,83 +12,65 @@ const createDocument = (documentData, callback) => {
 
 /**
  * Get documents based on user role
- * @param {String} role - User role (SaleCo, QA, Inventory)
- * @param {Number} userId - User ID for filtering
- * @param {Function} callback - Callback function(err, documents)
  */
 const getDocumentsByUserRole = (role, userId, callback) => {
   let sql = '';
   let params = [];
-  
-  // Different SQL based on role
+
   switch (role) {
     case 'SaleCo':
-      // SaleCo users see only their documents
-      sql = `SELECT d.*, u.name AS creatorName 
-             FROM documents_nc d 
-             JOIN NC_Login u ON d.createdBy = u.id 
-             WHERE d.createdBy = ?`;
+      sql = `
+        SELECT d.*, u.name AS creatorName 
+        FROM documents_nc d
+        JOIN NC_Login u ON d.createdBy = u.id
+        WHERE d.createdBy = ?
+        ORDER BY d.created_at DESC
+      `;
       params = [userId];
       break;
-      
+
     case 'QA':
-      // QA users see all documents
-      sql = `SELECT d.*, u.name AS creatorName 
-             FROM documents_nc d 
-             JOIN NC_Login u ON d.createdBy = u.id 
-             ORDER BY d.created_at DESC`;
-      break;
-      
     case 'Inventory':
-      // Inventory sees all documents
-      sql = `SELECT d.*, u.name AS creatorName 
-             FROM documents_nc d 
-             JOIN NC_Login u ON d.createdBy = u.id 
-             ORDER BY d.created_at DESC`;
+      sql = `
+        SELECT d.*, u.name AS creatorName 
+        FROM documents_nc d
+        JOIN NC_Login u ON d.createdBy = u.id
+        ORDER BY d.created_at DESC
+      `;
       break;
-      
+
     default:
       return callback(new Error('Invalid role'));
   }
-  
+
   db.pool.query(sql, params, (err, results) => {
     if (err) return callback(err);
-    
-    // Convert binary data if needed
-    const documents = results.map(doc => {
-      // Remove any Buffer objects that can't be JSON serialized
-      const serializable = { ...doc };
-      return serializable;
-    });
-    
+
+    // strip out any Buffer fields
+    const documents = results.map(doc => ({ ...doc }));
     callback(null, documents);
   });
 };
 
 /**
- * Get a document by ID
- * @param {Number} id - Document ID
- * @param {Function} callback - Callback function(err, document)
+ * Get a single document by its internal id
  */
 const getDocumentById = (id, callback) => {
-  const sql = `SELECT d.*, u.name AS creatorName 
-               FROM documents_nc d 
-               JOIN NC_Login u ON d.createdBy = u.id 
-               WHERE d.id = ?`;
-  
+  const sql = `
+    SELECT d.*, u.name AS creatorName
+    FROM documents_nc d
+    JOIN NC_Login u ON d.createdBy = u.id
+    WHERE d.id = ?
+  `;
   db.pool.query(sql, [id], (err, results) => {
     if (err) return callback(err);
-    if (results.length === 0) return callback(null, null);
-    
+    if (!results.length) return callback(null, null);
     callback(null, results[0]);
   });
 };
 
 /**
- * Update a document
- * @param {Number} id - Document ID
- * @param {Object} updateData - Data to update
- * @param {Function} callback - Callback function(err, result)
+ * Update arbitrary columns for a document
  */
 const updateDocument = (id, updateData, callback) => {
   const sql = `UPDATE documents_nc SET ? WHERE id = ?`;
@@ -98,12 +79,50 @@ const updateDocument = (id, updateData, callback) => {
 
 /**
  * Delete a document
- * @param {Number} id - Document ID
- * @param {Function} callback - Callback function(err, result)
  */
 const deleteDocument = (id, callback) => {
   const sql = `DELETE FROM documents_nc WHERE id = ?`;
   db.pool.query(sql, [id], callback);
+};
+
+/**
+ * Inventory “accept” — flips status to
+ *  • “Accepted by Inventory”
+ *  • or “Accepted by Both” if QA already accepted
+ */
+const acceptByInventory = (id, inventoryName, callback) => {
+  const sql = `
+    UPDATE documents_nc
+    SET
+      status = CASE
+        WHEN status = 'Accepted by QA' THEN 'Accepted by Both'
+        ELSE 'Accepted by Inventory'
+      END,
+      InventoryName      = ?,
+      InventoryTimeStamp = NOW()
+    WHERE id = ?
+  `;
+  db.pool.query(sql, [inventoryName, id], callback);
+};
+
+/**
+ * QA “accept” stamp — flips status to
+ *  • “Accepted by QA”
+ *  • or “Accepted by Both” if Inventory already accepted
+ */
+const acceptByQA = (id, qaName, callback) => {
+  const sql = `
+    UPDATE documents_nc
+    SET
+      status = CASE
+        WHEN status = 'Accepted by Inventory' THEN 'Accepted by Both'
+        ELSE 'Accepted by QA'
+      END,
+      QAName      = ?,
+      QATimeStamp = NOW()
+    WHERE id = ?
+  `;
+  db.pool.query(sql, [qaName, id], callback);
 };
 
 module.exports = {
@@ -111,5 +130,7 @@ module.exports = {
   getDocumentsByUserRole,
   getDocumentById,
   updateDocument,
-  deleteDocument
+  deleteDocument,
+  acceptByInventory,
+  acceptByQA
 };

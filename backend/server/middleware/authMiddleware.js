@@ -70,8 +70,8 @@ const authorizeRoles = (allowedRoles) => {
   };
 };
 
-module.exports = { 
-  generateToken, 
-  authenticateJWT,
+module.exports = {
+  generateToken,
+  authenticateJWT,    // ← add this line
   authorizeRoles
 };

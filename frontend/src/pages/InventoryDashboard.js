@@ -1,11 +1,12 @@
 // client/src/pages/InventoryDashboard.js
 import React, { useEffect, useState } from 'react';
 import {
-  Box, 
-  Typography, 
-  Grid, 
-  Card, 
-  CardContent, 
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
   Chip,
   Divider,
   CircularProgress,
@@ -24,27 +25,31 @@ import {
   Paper,
   Snackbar,
   ToggleButtonGroup,
-  ToggleButton
+  ToggleButton,
+  Button
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Visibility as VisibilityIcon,
   GridView as GridViewIcon,
-  ViewList as ViewListIcon
+  ViewList as ViewListIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
 
 // Status chip color mapping
 const statusColors = {
-  'Inform NC': 'warning',
-  'Accepted': 'info',
+  'Created': 'warning',
+  'Accepted by Inventory': 'info',
+  'Accepted by QA': 'info',
+  'Accepted by Both': 'success',
   'In Progress': 'primary',
   'Completed': 'success',
   'Rejected': 'error'
 };
 
-const InventoryDashboard = () => {
+export default function InventoryDashboard() {
   const [docs, setDocs] = useState([]);
   const [filteredDocs, setFilteredDocs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,164 +58,123 @@ const InventoryDashboard = () => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
   const [tabValue, setTabValue] = useState(0);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
-  
-  // Stats for summary cards
-  const [stats, setStats] = useState({
-    total: 0,
-    pending: 0,
-    accepted: 0,
-    completed: 0,
-    rejected: 0
-  });
+  const [stats, setStats] = useState({ total:0, created:0, accepted:0, completed:0, rejected:0 });
 
-  // Fetch documents on component mount
+  // Install axios interceptors once
+  useEffect(() => {
+    axios.interceptors.request.use(config => {
+      const token = localStorage.getItem('token');
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+      return config;
+    });
+    axios.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          localStorage.clear();
+          window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+    );
+  }, []);
+
+  // Fetch documents on mount
   useEffect(() => {
     fetchDocuments();
   }, []);
 
-  // Calculate stats when docs change
+  // Update stats when docs change
   useEffect(() => {
-    if (docs.length) {
-      const newStats = {
-        total: docs.length,
-        pending: docs.filter(doc => doc.status === 'Inform NC').length,
-        accepted: docs.filter(doc => doc.status === 'Accepted').length,
-        completed: docs.filter(doc => doc.status === 'Completed').length,
-        rejected: docs.filter(doc => doc.status === 'Rejected').length
-      };
-      setStats(newStats);
-    }
+    const total    = docs.length;
+    const created  = docs.filter(d => d.status === 'Created').length;
+    const accepted = docs.filter(d => d.status.startsWith('Accepted')).length;
+    const completed = docs.filter(d => d.status === 'Completed').length;
+    const rejected = docs.filter(d => d.status === 'Rejected').length;
+    setStats({ total, created, accepted, completed, rejected });
   }, [docs]);
 
-  // Filter documents when search term or tab changes
+  // Filter documents on search or tab change
   useEffect(() => {
-    if (!docs.length) {
-      setFilteredDocs([]);
-      return;
-    }
-    
-    let filtered = [...docs];
-    
-    // Filter by tab value (status)
-    if (tabValue === 0) {
-      // All documents
-    } else if (tabValue === 1) {
-      // Pending (Inform NC)
-      filtered = filtered.filter(doc => doc.status === 'Inform NC');
+    let fd = [...docs];
+    if (tabValue === 1) {
+      fd = fd.filter(d => d.status === 'Created');
     } else if (tabValue === 2) {
-      // Accepted
-      filtered = filtered.filter(doc => doc.status === 'Accepted');
+      fd = fd.filter(d => d.status.startsWith('Accepted'));
     } else if (tabValue === 3) {
-      // Completed
-      filtered = filtered.filter(doc => 
-        doc.status === 'Completed' || doc.status === 'Rejected'
-      );
+      fd = fd.filter(d => d.status === 'Completed' || d.status === 'Rejected');
     }
-    
-    // Then filter by search term
-    if (searchTerm.trim() !== '') {
+    if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(doc => 
-        doc.documentNumber?.toLowerCase().includes(term) ||
-        doc.productType?.toLowerCase().includes(term) ||
-        doc.issueFound?.toLowerCase().includes(term) ||
-        doc.lotNo?.toLowerCase().includes(term)
+      fd = fd.filter(d =>
+        d.Document_id.toLowerCase().includes(term) ||
+        d.Product_id.toString().includes(term) ||
+        d.Issue_Found.toLowerCase().includes(term) ||
+        d.Lot_No.toLowerCase().includes(term)
       );
     }
-    
-    setFilteredDocs(filtered);
-  }, [searchTerm, tabValue, docs]);
+    setFilteredDocs(fd);
+  }, [docs, tabValue, searchTerm]);
 
-  // Fetch documents from API
-  const fetchDocuments = async () => {
+  // Async fetch function
+  async function fetchDocuments() {
     setLoading(true);
     setError('');
-    
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Authentication required. Please log in.');
-        setLoading(false);
-        return;
-      }
-      
-      const response = await axios.get('/api/documents/list', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setDocs(response.data);
+      const { data } = await axios.get('/api/documents/list');
+      setDocs(data);
     } catch (err) {
       console.error('Error fetching documents:', err);
-      
-      if (err.response) {
-        if (err.response.status === 401) {
-          setError('Authentication error. Please log in again.');
-        } else {
-          setError(err.response.data.message || 'Error fetching documents');
-        }
-      } else if (err.request) {
-        setError('No response from server. Please check your connection.');
-      } else {
-        setError('Error fetching documents. Please try again later.');
-      }
+      setError(err.response?.data?.message || 'Error fetching documents');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  // Handle tab change
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  // Handle view mode change
-  const handleViewModeChange = (event, newViewMode) => {
-    if (newViewMode !== null) {
-      setViewMode(newViewMode);
+  // Handle inventory accept
+  const handleAccept = async (doc) => {
+    if (!window.confirm('Accept this document?')) return;
+    try {
+      await axios.post(`/api/documents/${doc.id}/accept-inventory`);
+      setDocs(docs.map(d => {
+        if (d.id !== doc.id) return d;
+        const newStatus = d.status === 'Accepted by QA'
+          ? 'Accepted by Both'
+          : 'Accepted by Inventory';
+        return {
+          ...d,
+          status: newStatus,
+          InventoryName: localStorage.getItem('userName') || 'Inventory',
+          InventoryTimeStamp: new Date().toISOString()
+        };
+      }));
+      setNotification({ open: true, message: 'Accepted successfully', severity: 'success' });
+    } catch (err) {
+      console.error('Error accepting:', err);
+      setNotification({ open: true, message: err.response?.data?.message || 'Accept failed', severity: 'error' });
     }
   };
 
-  // Close notification
-  const handleCloseNotification = () => {
-    setNotification({ ...notification, open: false });
-  };
-
-  // Render loading state
   if (loading) {
     return (
-      <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Typography variant="h4" gutterBottom>Inventory Dashboard</Typography>
-        <CircularProgress sx={{ mt: 4 }} />
-        <Typography variant="body1" sx={{ mt: 2 }}>Loading documents...</Typography>
+      <Box sx={{ p:3, textAlign:'center' }}>
+        <Typography variant="h4">Inventory Dashboard</Typography>
+        <CircularProgress sx={{ mt:2 }} />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header with search and view toggle */}
-      <Box 
-        display="flex" 
-        justifyContent="space-between" 
-        alignItems="center"
-        flexWrap="wrap"
-        gap={2}
-        mb={2}
-      >
+    <Box sx={{ p:3 }}>
+      {/* Header */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
         <Typography variant="h4">Inventory Dashboard</Typography>
-        
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+        <Box display="flex" alignItems="center" gap={2}>
           <TextField
-            placeholder="Search documents..."
+            placeholder="Search..."
             size="small"
             value={searchTerm}
-            onChange={handleSearchChange}
-            sx={{ minWidth: 200 }}
+            onChange={e => setSearchTerm(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -219,133 +183,86 @@ const InventoryDashboard = () => {
               )
             }}
           />
-          
           <ToggleButtonGroup
             value={viewMode}
             exclusive
-            onChange={handleViewModeChange}
-            aria-label="view mode"
+            onChange={(_, v) => v && setViewMode(v)}
             size="small"
           >
-            <ToggleButton value="grid" aria-label="grid view">
-              <GridViewIcon />
-            </ToggleButton>
-            <ToggleButton value="table" aria-label="table view">
-              <ViewListIcon />
-            </ToggleButton>
+            <ToggleButton value="grid"><GridViewIcon/></ToggleButton>
+            <ToggleButton value="table"><ViewListIcon/></ToggleButton>
           </ToggleButtonGroup>
         </Box>
       </Box>
 
-      {/* Stats cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={6} sm={4} md={2.4}>
-          <Card sx={{ bgcolor: '#f5f5f5' }}>
-            <CardContent sx={{ py: 1, textAlign: 'center' }}>
-              <Typography variant="h4" color="text.primary">{stats.total}</Typography>
-              <Typography variant="body2" color="text.secondary">Total</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={4} md={2.4}>
-          <Card sx={{ bgcolor: statusColors['Inform NC'] + '22' }}>
-            <CardContent sx={{ py: 1, textAlign: 'center' }}>
-              <Typography variant="h4" color={statusColors['Inform NC']}>{stats.pending}</Typography>
-              <Typography variant="body2" color="text.secondary">Pending</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={4} md={2.4}>
-          <Card sx={{ bgcolor: statusColors['Accepted'] + '22' }}>
-            <CardContent sx={{ py: 1, textAlign: 'center' }}>
-              <Typography variant="h4" color={statusColors['Accepted']}>{stats.accepted}</Typography>
-              <Typography variant="body2" color="text.secondary">Accepted</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={4} md={2.4}>
-          <Card sx={{ bgcolor: statusColors['Completed'] + '22' }}>
-            <CardContent sx={{ py: 1, textAlign: 'center' }}>
-              <Typography variant="h4" color={statusColors['Completed']}>{stats.completed}</Typography>
-              <Typography variant="body2" color="text.secondary">Completed</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} sm={4} md={2.4}>
-          <Card sx={{ bgcolor: statusColors['Rejected'] + '22' }}>
-            <CardContent sx={{ py: 1, textAlign: 'center' }}>
-              <Typography variant="h4" color={statusColors['Rejected']}>{stats.rejected}</Typography>
-              <Typography variant="body2" color="text.secondary">Rejected</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Stats */}
+      <Grid container spacing={2} mb={3}>
+        {[
+          ['Total', stats.total],
+          ['Created', stats.created],
+          ['Accepted', stats.accepted],
+          ['Completed', stats.completed],
+          ['Rejected', stats.rejected]
+        ].map(([label, value]) => (
+          <Grid item xs={6} md={2.4} key={label}>
+            <Card sx={{ bgcolor: '#f5f5f5' }}>
+              <CardContent sx={{ py:1, textAlign:'center' }}>
+                <Typography variant="h4" color="text.primary">{value}</Typography>
+                <Typography variant="body2" color="text.secondary">{label}</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
 
-      {/* Status tabs */}
-      <Tabs 
-        value={tabValue} 
-        onChange={handleTabChange} 
-        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
-      >
-        <Tab label="All Documents" />
-        <Tab label="Pending" />
+      {/* Tabs */}
+      <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ mb:2 }}>
+        <Tab label="All" />
+        <Tab label="Created" />
         <Tab label="Accepted" />
-        <Tab label="Completed" />
+        <Tab label="Completed/Rejected" />
       </Tabs>
 
-      {/* Error message */}
-      {error && (
-        <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert severity="error" sx={{ my:2 }}>{error}</Alert>}
+      {!error && !filteredDocs.length && <Alert severity="info">No documents found.</Alert>}
 
-      {/* No documents message */}
-      {!error && filteredDocs.length === 0 && (
-        <Alert severity="info" sx={{ mt: 2 }}>
-          {searchTerm ? 'No documents match your search.' : 'No documents found in this category.'}
-        </Alert>
-      )}
-
-      {/* Table view */}
+      {/* Table View */}
       {viewMode === 'table' && filteredDocs.length > 0 && (
-        <TableContainer component={Paper} sx={{ mt: 2 }}>
-          <Table sx={{ minWidth: 650 }} aria-label="documents table">
+        <TableContainer component={Paper} sx={{ mt:2 }}>
+          <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                <TableCell>Document #</TableCell>
-                <TableCell>Product Type</TableCell>
-                <TableCell>Lot Number</TableCell>
+              <TableRow>
+                <TableCell>Doc #</TableCell>
+                <TableCell>Product ID</TableCell>
+                <TableCell>Lot</TableCell>
                 <TableCell>Issue</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>QA Name</TableCell>
-                <TableCell align="center">Actions</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredDocs.map((doc) => (
-                <TableRow key={doc.id} sx={{ '&:hover': { bgcolor: '#f9f9f9' } }}>
-                  <TableCell>{doc.documentNumber || `Doc #${doc.id}`}</TableCell>
-                  <TableCell>{doc.productType}</TableCell>
-                  <TableCell>{doc.lotNo}</TableCell>
-                  <TableCell>{doc.issueFound}</TableCell>
+              {filteredDocs.map(doc => (
+                <TableRow key={doc.id} hover>
+                  <TableCell>{doc.Document_id}</TableCell>
+                  <TableCell>{doc.Product_id}</TableCell>
+                  <TableCell>{doc.Lot_No}</TableCell>
+                  <TableCell>{doc.Issue_Found}</TableCell>
                   <TableCell>
-                    <Chip 
-                      label={doc.status} 
-                      color={statusColors[doc.status] || 'default'} 
-                      size="small"
-                    />
+                    <Chip label={doc.status} color={statusColors[doc.status]} />
                   </TableCell>
-                  <TableCell>{doc.qaName || '—'}</TableCell>
-                  <TableCell align="center">
-                    <IconButton 
-                      size="small" 
-                      component={RouterLink} 
-                      to={`/inventory/view/${doc.id}`}
-                      title="View details"
-                    >
-                      <VisibilityIcon fontSize="small" />
+                  <TableCell>
+                    <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
+                      <VisibilityIcon/>
                     </IconButton>
+                    {doc.status === 'Created' && (
+                      <Button
+                        size="small"
+                        startIcon={<CheckCircleIcon />}
+                        onClick={() => handleAccept(doc)}
+                      >
+                        Accept
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -354,84 +271,54 @@ const InventoryDashboard = () => {
         </TableContainer>
       )}
 
-      {/* Grid view */}
+      {/* Grid View */}
       {viewMode === 'grid' && (
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          {filteredDocs.map((doc) => (
+        <Grid container spacing={2}>
+          {filteredDocs.map(doc => (
             <Grid item xs={12} md={6} lg={4} key={doc.id}>
-              <Card 
-                sx={{ 
-                  height: '100%', 
-                  display: 'flex', 
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
                   flexDirection: 'column',
-                  transition: 'transform 0.2s ease-in-out',
-                  '&:hover': {
-                    transform: 'translateY(-5px)',
-                    boxShadow: 3
-                  }
+                  transition: 'transform .2s',
+                  '&:hover': { transform: 'translateY(-5px)', boxShadow: 3 }
                 }}
               >
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                    <Typography variant="h6" gutterBottom>{doc.documentNumber || `Document #${doc.id}`}</Typography>
-                    <Chip 
-                      label={doc.status} 
-                      color={statusColors[doc.status] || 'default'} 
-                      size="small"
-                    />
+                <CardContent sx={{ flexGrow:1 }}>
+                  <Box display="flex" justifyContent="space-between">
+                    <Typography variant="h6">{doc.Document_id}</Typography>
+                    <Chip label={doc.status} color={statusColors[doc.status]} size="small"/>
                   </Box>
-                  
-                  <Divider sx={{ my: 1 }} />
-                  
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    <strong>Product:</strong> {doc.productType}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    <strong>Lot No:</strong> {doc.lotNo}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    <strong>Issue:</strong> {doc.issueFound}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    <strong>QA:</strong> {doc.qaName || '—'}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Created:</strong> {new Date(doc.created_at).toLocaleDateString()}
-                  </Typography>
+                  <Divider sx={{ my:1 }}/>
+                  <Typography><strong>Product:</strong> {doc.Product_id}</Typography>
+                  <Typography><strong>Lot:</strong> {doc.Lot_No}</Typography>
+                  <Typography><strong>Issue:</strong> {doc.Issue_Found}</Typography>
                 </CardContent>
-                
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1 }}>
-                  <IconButton 
-                    size="small" 
-                    component={RouterLink} 
-                    to={`/inventory/view/${doc.id}`}
-                    title="View details"
-                  >
-                    <VisibilityIcon fontSize="small" />
+                <CardActions sx={{ justifyContent:'space-between', p:1 }}>
+                  <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
+                    <VisibilityIcon/>
                   </IconButton>
-                </Box>
+                  {doc.status === 'Created' && (
+                    <IconButton onClick={() => handleAccept(doc)} color="primary">
+                      <CheckCircleIcon/>
+                    </IconButton>
+                  )}
+                </CardActions>
               </Card>
             </Grid>
           ))}
         </Grid>
       )}
-      
-      {/* Notification */}
+
+      {/* Snackbar */}
       <Snackbar
         open={notification.open}
         autoHideDuration={6000}
-        onClose={handleCloseNotification}
+        onClose={() => setNotification(n => ({ ...n, open: false }))}
       >
-        <Alert 
-          onClose={handleCloseNotification} 
-          severity={notification.severity} 
-          sx={{ width: '100%' }}
-        >
-          {notification.message}
-        </Alert>
+        <Alert severity={notification.severity}>{notification.message}</Alert>
       </Snackbar>
     </Box>
   );
-};
-
-export default InventoryDashboard;
+}

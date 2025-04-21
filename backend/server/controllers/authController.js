@@ -5,6 +5,7 @@ const jwt = require('jwt-simple');
 const nodemailer = require('nodemailer');
 const {
   findUserByEmail,
+  findUserById,
   findPendingByEmail,
   createPending,
   deletePending,
@@ -253,7 +254,7 @@ exports.login = (req, res) => {
  * GET /api/auth/profile
  */
 exports.getProfile = (req, res) => {
-  const userId = req.user.userId;
+  const userId = req.user.id;  // Changed from userId to id to match the token payload
   
   findUserById(userId, (err, user) => {
     if (err) {

@@ -27,11 +27,23 @@ const DEPARTMENTS = ['R&D', 'Production', 'Quality Control', 'Sales', 'Marketing
 export default function DocumentForm() {
   const theme = useTheme();
   const navigate = useNavigate();
+
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
-    productType: '', productId: '', lotNo: '', size: '', quantity: '',
-    issueFound: '', foundeeName: '', department: '', subsidiary: '',
-    whatHappened: '', preventionMeasure: '', picture1: null, picture2: null
+    productType: '',
+    productId: '',
+    snNumber: '',         // ← new
+    description: '',      // ← new
+    lotNo: '',
+    size: '',
+    quantity: '',
+    issueFound: '',
+    foundeeName: '',
+    department: '',
+    whatHappened: '',
+    preventionMeasure: '',
+    picture1: null,
+    picture2: null
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -63,7 +75,9 @@ export default function DocumentForm() {
   const handleNext = () => {
     if (activeStep < steps.length - 1) {
       if (validateStep(activeStep)) setActiveStep(prev => prev + 1);
-    } else handleSubmit();
+    } else {
+      handleSubmit();
+    }
   };
 
   const handleBack = () => setActiveStep(prev => prev - 1);
@@ -71,79 +85,99 @@ export default function DocumentForm() {
   const handleSubmit = async () => {
     setLoading(true);
     const payload = new FormData();
-    Object.entries(formData).forEach(([k,v]) => v && payload.append(k,v));
+    // append every field (files and text)
+    Object.entries(formData).forEach(([k, v]) => {
+      if (v !== null && v !== '') {
+        payload.append(k, v);
+      }
+    });
+
     try {
-      await axios.post('/api/documents/', payload, { headers: {'Content-Type':'multipart/form-data'} });
+      await axios.post('/api/documents/', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       setFeedback({ open: true, message: 'Submitted successfully!', severity: 'success' });
       setTimeout(() => navigate('/saleco'), 1500);
     } catch (err) {
-      setFeedback({ open: true, message: err.response?.data?.message || 'Submit failed', severity: 'error' });
+      console.error('[DocumentForm] submit error:', err);
+      setFeedback({
+        open: true,
+        message: err.response?.data?.message || 'Submit failed',
+        severity: 'error'
+      });
       setLoading(false);
     }
   };
 
   const StepContent = () => {
-    const commonProps = { fullWidth: true, variant: 'outlined', size: 'medium', sx: { background: '#fafafa' } };
+    const common = { fullWidth: true, variant: 'outlined', size: 'medium' };
     switch (activeStep) {
       case 0:
         return (
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
               <TextField
-                select
-                label="Product Type"
-                name="productType"
-                value={formData.productType}
-                onChange={handleChange}
-                error={!!errors.productType}
-                helperText={errors.productType}
-                {...commonProps}
+                select label="Product Type" name="productType"
+                value={formData.productType} onChange={handleChange}
+                error={!!errors.productType} helperText={errors.productType}
+                {...common}
               >
-                {PRODUCT_TYPES.map(pt => <MenuItem key={pt} value={pt}>{pt}</MenuItem>)}
+                {PRODUCT_TYPES.map(pt => (
+                  <MenuItem key={pt} value={pt}>{pt}</MenuItem>
+                ))}
               </TextField>
             </Grid>
+
             <Grid item xs={12} md={6}>
               <TextField
-                label="Product ID"
-                name="productId"
-                value={formData.productId}
-                onChange={handleChange}
-                error={!!errors.productId}
-                helperText={errors.productId}
-                {...commonProps}
+                label="Product ID" name="productId"
+                value={formData.productId} onChange={handleChange}
+                error={!!errors.productId} helperText={errors.productId}
+                {...common}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+
+            <Grid item xs={12} md={6}>
               <TextField
-                label="Lot Number"
-                name="lotNo"
-                value={formData.lotNo}
-                onChange={handleChange}
-                error={!!errors.lotNo}
-                helperText={errors.lotNo}
-                {...commonProps}
+                label="Serial Number" name="snNumber"
+                value={formData.snNumber} onChange={handleChange}
+                {...common}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+
+            <Grid item xs={12} md={6}>
               <TextField
-                label="Size"
-                name="size"
-                value={formData.size}
-                onChange={handleChange}
-                {...commonProps}
+                label="Lot Number" name="lotNo"
+                value={formData.lotNo} onChange={handleChange}
+                error={!!errors.lotNo} helperText={errors.lotNo}
+                {...common}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+
+            <Grid item xs={12}>
               <TextField
-                label="Quantity"
-                name="quantity"
-                type="number"
-                value={formData.quantity}
-                onChange={handleChange}
-                error={!!errors.quantity}
-                helperText={errors.quantity}
+                label="Description" name="description"
+                multiline rows={2}
+                value={formData.description} onChange={handleChange}
+                {...common}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Size" name="size"
+                value={formData.size} onChange={handleChange}
+                {...common}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Quantity" name="quantity" type="number"
+                value={formData.quantity} onChange={handleChange}
+                error={!!errors.quantity} helperText={errors.quantity}
                 InputProps={{ inputProps: { min: 1 } }}
-                {...commonProps}
+                {...common}
               />
             </Grid>
           </Grid>
@@ -153,66 +187,50 @@ export default function DocumentForm() {
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <TextField
-                label="Issue Found"
-                name="issueFound"
-                multiline
-                rows={2}
-                value={formData.issueFound}
-                onChange={handleChange}
-                error={!!errors.issueFound}
-                helperText={errors.issueFound}
-                {...commonProps}
+                label="Issue Found" name="issueFound" multiline rows={2}
+                value={formData.issueFound} onChange={handleChange}
+                error={!!errors.issueFound} helperText={errors.issueFound}
+                {...common}
               />
             </Grid>
+
             <Grid item xs={12} md={6}>
               <TextField
-                label="Foundee Name"
-                name="foundeeName"
-                value={formData.foundeeName}
-                onChange={handleChange}
-                error={!!errors.foundeeName}
-                helperText={errors.foundeeName}
-                {...commonProps}
+                label="Foundee Name" name="foundeeName"
+                value={formData.foundeeName} onChange={handleChange}
+                error={!!errors.foundeeName} helperText={errors.foundeeName}
+                {...common}
               />
             </Grid>
+
             <Grid item xs={12} md={6}>
               <TextField
-                select
-                label="Department"
-                name="department"
-                value={formData.department}
-                onChange={handleChange}
-                error={!!errors.department}
-                helperText={errors.department}
-                {...commonProps}
+                select label="Department" name="department"
+                value={formData.department} onChange={handleChange}
+                error={!!errors.department} helperText={errors.department}
+                {...common}
               >
-                {DEPARTMENTS.map(d => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                {DEPARTMENTS.map(d => (
+                  <MenuItem key={d} value={d}>{d}</MenuItem>
+                ))}
               </TextField>
             </Grid>
+
             <Grid item xs={12}>
               <TextField
-                label="What Happened"
-                name="whatHappened"
-                multiline
-                rows={3}
-                value={formData.whatHappened}
-                onChange={handleChange}
-                error={!!errors.whatHappened}
-                helperText={errors.whatHappened}
-                {...commonProps}
+                label="What Happened" name="whatHappened" multiline rows={3}
+                value={formData.whatHappened} onChange={handleChange}
+                error={!!errors.whatHappened} helperText={errors.whatHappened}
+                {...common}
               />
             </Grid>
+
             <Grid item xs={12}>
               <TextField
-                label="Prevention Measure"
-                name="preventionMeasure"
-                multiline
-                rows={3}
-                value={formData.preventionMeasure}
-                onChange={handleChange}
-                error={!!errors.preventionMeasure}
-                helperText={errors.preventionMeasure}
-                {...commonProps}
+                label="Prevention Measure" name="preventionMeasure" multiline rows={3}
+                value={formData.preventionMeasure} onChange={handleChange}
+                error={!!errors.preventionMeasure} helperText={errors.preventionMeasure}
+                {...common}
               />
             </Grid>
           </Grid>
@@ -220,17 +238,21 @@ export default function DocumentForm() {
       case 2:
         return (
           <Grid container spacing={2}>
-            {['picture1', 'picture2'].map((name, i) => (
+            {['picture1', 'picture2'].map((name, idx) => (
               <Grid item xs={12} md={6} key={name}>
                 <Button
-                  variant="outlined"
-                  component="label"
-                  fullWidth
+                  variant="outlined" component="label" fullWidth
                   startIcon={<PhotoCamera />}
                   sx={{ height: '56px', borderColor: theme.palette.primary.main }}
                 >
-                  {formData[name]?.name || `Upload Picture ${i+1}`}
-                  <input type="file" hidden name={name} accept="image/*" onChange={handleChange} />
+                  {formData[name]?.name || `Upload Picture ${idx + 1}`}
+                  <input
+                    type="file"
+                    hidden
+                    name={name}
+                    accept="image/*"
+                    onChange={handleChange}
+                  />
                 </Button>
               </Grid>
             ))}
@@ -239,9 +261,13 @@ export default function DocumentForm() {
       case 3:
         return (
           <Box>
-            <Typography variant="subtitle1" mb={1}>Review your entries:</Typography>
-            <Paper variant="outlined" sx={{ background: '#f7f7f7', p: 2 }}>
-              <pre style={{ margin: 0, fontFamily: 'inherit' }}>{JSON.stringify(formData, null, 2)}</pre>
+            <Typography variant="subtitle1" mb={1}>
+              Review your entries:
+            </Typography>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <pre style={{ margin: 0, fontFamily: 'inherit' }}>
+                {JSON.stringify(formData, null, 2)}
+              </pre>
             </Paper>
           </Box>
         );
@@ -252,7 +278,9 @@ export default function DocumentForm() {
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', my: 5 }}>
-      <Typography variant="h4" align="center" gutterBottom color="primary">Non-Conformance Report</Typography>
+      <Typography variant="h4" align="center" gutterBottom color="primary">
+        Non‑Conformance Report
+      </Typography>
       <Paper elevation={4} sx={{ p: 3, borderRadius: 2, boxShadow: 3 }}>
         <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
           {steps.map((label, idx) => (
@@ -263,20 +291,38 @@ export default function DocumentForm() {
                   '& .MuiStepIcon-root.Mui-active': { color: theme.palette.primary.main },
                   '& .MuiStepLabel-label.Mui-active': { fontWeight: 'bold' }
                 }}
-              >{label}</StepLabel>
+              >
+                {label}
+              </StepLabel>
             </Step>
           ))}
         </Stepper>
+
         <Box>{StepContent()}</Box>
-        <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 3 }}>
-          <Button onClick={handleBack} disabled={activeStep===0 || loading}>Back</Button>
-          <Button variant="contained" onClick={handleNext} disabled={loading} sx={{ px: 3 }}>
-            {activeStep === steps.length -1 ? (loading ? <CircularProgress size={20}/> : 'Submit') : 'Next'}
+
+        <Stack direction="row" justifyContent="flex-end" spacing={2} sx={{ mt: 3 }}>
+          <Button onClick={handleBack} disabled={activeStep === 0 || loading}>
+            Back
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleNext}
+            disabled={loading}
+            sx={{ px: 3 }}
+          >
+            {activeStep === steps.length - 1
+              ? (loading ? <CircularProgress size={20} /> : 'Submit')
+              : 'Next'}
           </Button>
         </Stack>
       </Paper>
-      <Snackbar open={feedback.open} autoHideDuration={6000} onClose={() => setFeedback(f => ({ ...f, open: false }))}
-        message={feedback.message} />
+
+      <Snackbar
+        open={feedback.open}
+        autoHideDuration={6000}
+        onClose={() => setFeedback(f => ({ ...f, open: false }))}
+        message={feedback.message}
+      />
     </Box>
   );
 }

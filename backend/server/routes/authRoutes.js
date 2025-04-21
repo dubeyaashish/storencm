@@ -1,15 +1,16 @@
 // server/routes/authRoutes.js
 const express = require('express');
+const router  = express.Router();
 const { register, verifyOtp, login, getProfile } = require('../controllers/authController');
+// now this matches:
 const { authenticateJWT } = require('../middleware/authMiddleware');
-const router = express.Router();
 
-// Public routes
-router.post('/register', register);      // Step 1: send OTP
-router.post('/verify-otp', verifyOtp);   // Step 2: confirm OTP
-router.post('/login', login);            // Login and get token
+// Public
+router.post('/register',    register);
+router.post('/verify-otp',  verifyOtp);
+router.post('/login',       login);
 
-// Protected routes
-router.get('/profile', authenticateJWT, getProfile); // Get current user profile
+// Protected
+router.get('/profile', authenticateJWT, getProfile);
 
 module.exports = router;

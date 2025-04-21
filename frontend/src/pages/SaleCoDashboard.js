@@ -151,7 +151,7 @@ const SaleCoDashboard = () => {
   if (loading) {
     return (
       <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Typography variant="h4" gutterBottom>SaleCo Dashboard</Typography>
+        <Typography variant="h6" gutterBottom>Documents</Typography>
         <CircularProgress sx={{ mt: 4 }} />
         <Typography variant="body1" sx={{ mt: 2 }}>Loading documents...</Typography>
       </Box>
@@ -168,7 +168,7 @@ const SaleCoDashboard = () => {
         flexWrap="wrap"
         gap={2}
       >
-        <Typography variant="h4">SaleCo Dashboard</Typography>
+        <Typography variant="h5">Documents</Typography>
         
         <Box sx={{ display: 'flex', gap: 2 }}>
           <TextField
@@ -185,15 +185,6 @@ const SaleCoDashboard = () => {
               )
             }}
           />
-          
-          <Button 
-            variant="contained" 
-            component={RouterLink} 
-            to="/saleco/create"
-            startIcon={<AddIcon />}
-          >
-            New Document
-          </Button>
         </Box>
       </Box>
 
@@ -259,7 +250,7 @@ const SaleCoDashboard = () => {
                 <IconButton 
                   size="small" 
                   component={RouterLink} 
-                  to={`/saleco/view/${doc.id}`}
+                  to={`/saleco/view/${doc.Document_id}`}
                   title="View details"
                 >
                   <VisibilityIcon fontSize="small" />
