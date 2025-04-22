@@ -1,5 +1,6 @@
 // client/src/pages/SaleCoDashboard.js
 import React, { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet';
 import {
   Box, 
   Typography, 
@@ -215,6 +216,12 @@ const SaleCoDashboard = () => {
   }
 
   return (
+    <>
+    {/* 1) Helmet goes here */}
+    <Helmet>
+      <title>SaleCo</title>
+    </Helmet>
+
     <Box sx={{ p: 3 }}>
       {/* Header with search, view toggle, and create button */}
       <Box 
@@ -484,6 +491,7 @@ const SaleCoDashboard = () => {
         </Alert>
       </Snackbar>
     </Box>
+    </>
   );
 };
 

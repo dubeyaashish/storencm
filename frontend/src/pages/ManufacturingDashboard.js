@@ -40,6 +40,7 @@ import {
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
+import { Helmet } from 'react-helmet';
 
 // Status chip color mapping
 const statusColors = {
@@ -210,6 +211,10 @@ export default function ManufacturingDashboard() {
   }
 
   return (
+    <>
+    <Helmet>
+          <title>MFG</title>
+    </Helmet>
     <Box sx={{ p:3 }}>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
@@ -434,5 +439,6 @@ export default function ManufacturingDashboard() {
         <Alert severity={notification.severity}>{notification.message}</Alert>
       </Snackbar>
     </Box>
+    </>
   );
 }

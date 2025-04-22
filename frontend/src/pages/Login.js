@@ -1,5 +1,7 @@
-// StyledLogin.js - Enhanced Reddit-style login page
+// client/src/pages/StyledLogin.js
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import logo from '../components/logo.png';
 import {
   Box,
   Tabs,
@@ -15,16 +17,17 @@ import {
 } from '@mui/material';
 import { LockOutlined, PersonAdd } from '@mui/icons-material';
 import axios from 'axios';
+import { Helmet } from 'react-helmet';
 
-// Make sure all three roles appear here:
 const roles = ['SaleCo', 'Inventory', 'QA', 'Manufacturing', 'Environment'];
 
 export default function StyledLogin() {
-  const [tab, setTab] = useState(0);
-  const [message, setMessage] = useState('');
+  const [tab, setTab]           = useState(0);
+  const [message, setMessage]   = useState('');
+  const navigate                 = useNavigate();
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginEmail, setLoginEmail]       = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
   // Registration form state
@@ -41,7 +44,7 @@ export default function StyledLogin() {
   const [regStep, setRegStep] = useState('form'); // 'form' → 'otp' → 'completed'
   const [otpForm, setOtpForm] = useState({ email: '', otp: '' });
 
-  const handleTabChange = (e, newVal) => {
+  const handleTabChange = (_, newVal) => {
     setTab(newVal);
     setMessage('');
     setRegStep('form');
@@ -52,21 +55,20 @@ export default function StyledLogin() {
     e.preventDefault();
     try {
       const { data } = await axios.post('/api/auth/login', {
-        email: loginEmail,
+        email:    loginEmail,
         password: loginPassword
       });
-      
-      // Store token and role
+
+      // Store auth info
       localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.role);
-      
-      // Store user data
+      localStorage.setItem('role',  data.role);
       if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('userName', data.user.name); // Also store name directly for compatibility
+        localStorage.setItem('user',     JSON.stringify(data.user));
+        localStorage.setItem('userName', data.user.name);
       }
-      
-      window.location.href = `/${data.role.toLowerCase()}`;
+
+      // SPA‑style navigate
+      navigate(`/${data.role.toLowerCase()}`, { replace: true });
     } catch (err) {
       setMessage(err.response?.data?.message || 'Login failed');
     }
@@ -101,279 +103,256 @@ export default function StyledLogin() {
   };
 
   return (
-    <Container component="main" maxWidth="sm">
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          mt: 8
-        }}
-      >
-        <Avatar sx={{ m: 1, bgcolor: 'primary.main', width: 56, height: 56 }}>
-          {tab === 0 ? <LockOutlined /> : <PersonAdd />}
-        </Avatar>
-        
-        <Typography component="h1" variant="h4" sx={{ mb: 2, fontWeight: 'bold' }}>
-          Document Control System
-        </Typography>
-        
-        <Paper 
-          sx={{ 
-            width: '100%', 
-            p: 3, 
-            borderRadius: 2,
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }} 
-          elevation={2}
+    <>
+      <Helmet>
+        <title>Login • Store NC</title>
+      </Helmet>
+
+      <Container component="main" maxWidth="sm">
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            mt: 8
+          }}
         >
-          <Tabs 
-            value={tab} 
-            onChange={handleTabChange} 
-            centered
+          <Avatar sx={{ m: 1, bgcolor: 'primary.main', width: 56, height: 56 }}>
+            {tab === 0 ? <LockOutlined /> : <PersonAdd />}
+          </Avatar>
+
+          <Typography component="h1" variant="h4" sx={{ mb: 2, fontWeight: 'bold' }}>
+            Document Control System
+          </Typography>
+
+          <Paper
             sx={{
-              '& .MuiTabs-indicator': {
-                height: 3,
-                borderRadius: 3
-              },
-              mb: 3
+              width: '100%',
+              p: 3,
+              borderRadius: 2,
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
             }}
+            elevation={2}
           >
-            <Tab 
-              label="Login" 
-              sx={{ 
-                fontWeight: tab === 0 ? 'bold' : 'normal',
-                fontSize: '1rem'
-              }} 
-            />
-            <Tab 
-              label="Register" 
-              sx={{ 
-                fontWeight: tab === 1 ? 'bold' : 'normal',
-                fontSize: '1rem'
-              }} 
-            />
-          </Tabs>
-
-          {message && (
-            <Alert 
-              sx={{ 
-                mb: 2,
-                borderRadius: 1
-              }} 
-              severity={message.includes('successful') ? 'success' : 'error'}
+            <Tabs
+              value={tab}
+              onChange={handleTabChange}
+              centered
+              sx={{
+                '& .MuiTabs-indicator': { height: 3, borderRadius: 3 },
+                mb: 3
+              }}
             >
-              {message}
-            </Alert>
-          )}
+              <Tab label="Login" sx={{ fontWeight: tab === 0 ? 'bold' : 'normal' }} />
+              <Tab label="Register" sx={{ fontWeight: tab === 1 ? 'bold' : 'normal' }} />
+            </Tabs>
 
-          {tab === 0 && (
-            <Box component="form" onSubmit={handleLogin} sx={{ mt: 1 }}>
-              <TextField
-                label="Email"
-                type="email"
-                fullWidth
-                margin="normal"
-                value={loginEmail}
-                onChange={e => setLoginEmail(e.target.value)}
-                required
-                sx={{ mb: 2 }}
-                variant="outlined"
-              />
-              <TextField
-                label="Password"
-                type="password"
-                fullWidth
-                margin="normal"
-                value={loginPassword}
-                onChange={e => setLoginPassword(e.target.value)}
-                required
-                sx={{ mb: 3 }}
-                variant="outlined"
-              />
-              <Button 
-                type="submit" 
-                variant="contained" 
-                fullWidth 
-                sx={{ 
-                  mt: 1, 
-                  mb: 2, 
-                  py: 1.5,
-                  fontSize: '1rem'
-                }}
+            {message && (
+              <Alert
+                sx={{ mb: 2, borderRadius: 1 }}
+                severity={message.includes('successful') ? 'success' : 'error'}
               >
-                Sign In
-              </Button>
-            </Box>
-          )}
+                {message}
+              </Alert>
+            )}
 
-          {tab === 1 && (
-            <Box sx={{ mt: 1 }}>
-              {regStep === 'form' && (
-                <Box component="form" onSubmit={handleRegSubmit}>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
+            {tab === 0 && (
+              <Box component="form" onSubmit={handleLogin} sx={{ mt: 1 }}>
+                <TextField
+                  label="Email"
+                  type="email"
+                  fullWidth
+                  margin="normal"
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  required
+                  sx={{ mb: 2 }}
+                  variant="outlined"
+                />
+                <TextField
+                  label="Password"
+                  type="password"
+                  fullWidth
+                  margin="normal"
+                  value={loginPassword}
+                  onChange={e => setLoginPassword(e.target.value)}
+                  required
+                  sx={{ mb: 3 }}
+                  variant="outlined"
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  sx={{ mt: 1, mb: 2, py: 1.5, fontSize: '1rem' }}
+                >
+                  Sign In
+                </Button>
+              </Box>
+            )}
+
+            {tab === 1 && (
+              <Box sx={{ mt: 1 }}>
+                {regStep === 'form' && (
+                  <Box component="form" onSubmit={handleRegSubmit}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField
+                        label="First Name"
+                        name="name"
+                        fullWidth
+                        margin="normal"
+                        value={regForm.name}
+                        onChange={e => setRegForm({ ...regForm, name: e.target.value })}
+                        required
+                      />
+                      <TextField
+                        label="Last Name"
+                        name="surname"
+                        fullWidth
+                        margin="normal"
+                        value={regForm.surname}
+                        onChange={e => setRegForm({ ...regForm, surname: e.target.value })}
+                        required
+                      />
+                    </Box>
+
                     <TextField
-                      label="First Name"
-                      name="name"
+                      label="Employee ID"
+                      name="employeeId"
                       fullWidth
                       margin="normal"
-                      value={regForm.name}
-                      onChange={e => setRegForm({ ...regForm, name: e.target.value })}
+                      value={regForm.employeeId}
+                      onChange={e =>
+                        setRegForm({ ...regForm, employeeId: e.target.value })
+                      }
                       required
                     />
+
                     <TextField
-                      label="Last Name"
-                      name="surname"
+                      label="Email"
+                      name="email"
+                      type="email"
                       fullWidth
                       margin="normal"
-                      value={regForm.surname}
-                      onChange={e => setRegForm({ ...regForm, surname: e.target.value })}
+                      value={regForm.email}
+                      onChange={e => setRegForm({ ...regForm, email: e.target.value })}
                       required
                     />
-                  </Box>
-                  
-                  <TextField
-                    label="Employee ID"
-                    name="employeeId"
-                    fullWidth
-                    margin="normal"
-                    value={regForm.employeeId}
-                    onChange={e => setRegForm({ ...regForm, employeeId: e.target.value })}
-                    required
-                  />
-                  
-                  <TextField
-                    label="Email"
-                    name="email"
-                    type="email"
-                    fullWidth
-                    margin="normal"
-                    value={regForm.email}
-                    onChange={e => setRegForm({ ...regForm, email: e.target.value })}
-                    required
-                  />
-                  
-                  <Box sx={{ display: 'flex', gap: 2 }}>
+
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField
+                        select
+                        label="Role"
+                        name="role"
+                        fullWidth
+                        margin="normal"
+                        value={regForm.role}
+                        onChange={e => setRegForm({ ...regForm, role: e.target.value })}
+                      >
+                        {roles.map(r => (
+                          <MenuItem key={r} value={r}>
+                            {r}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+
+                      <TextField
+                        label="Department"
+                        name="department"
+                        fullWidth
+                        margin="normal"
+                        value={regForm.department}
+                        onChange={e =>
+                          setRegForm({ ...regForm, department: e.target.value })
+                        }
+                        required
+                      />
+                    </Box>
+
                     <TextField
-                      select
-                      label="Role"
-                      name="role"
+                      label="Password"
+                      name="password"
+                      type="password"
                       fullWidth
                       margin="normal"
-                      value={regForm.role}
-                      onChange={e => setRegForm({ ...regForm, role: e.target.value })}
+                      value={regForm.password}
+                      onChange={e => setRegForm({ ...regForm, password: e.target.value })}
+                      required
+                    />
+
+                    <TextField
+                      label="Confirm Password"
+                      name="confirmPassword"
+                      type="password"
+                      fullWidth
+                      margin="normal"
+                      value={regForm.confirmPassword}
+                      onChange={e =>
+                        setRegForm({ ...regForm, confirmPassword: e.target.value })
+                      }
+                      required
+                      sx={{ mb: 2 }}
+                    />
+
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      fullWidth
+                      sx={{ mt: 2, mb: 2, py: 1.5, fontSize: '1rem' }}
                     >
-                      {roles.map(r => (
-                        <MenuItem key={r} value={r}>{r}</MenuItem>
-                      ))}
-                    </TextField>
-                    
+                      Register
+                    </Button>
+                  </Box>
+                )}
+
+                {regStep === 'otp' && (
+                  <Box component="form" onSubmit={handleOtpSubmit}>
+                    <Typography align="center" sx={{ mb: 2 }}>
+                      Enter the OTP sent to {otpForm.email}
+                    </Typography>
                     <TextField
-                      label="Department"
-                      name="department"
+                      label="OTP Code"
+                      name="otp"
                       fullWidth
                       margin="normal"
-                      value={regForm.department}
-                      onChange={e => setRegForm({ ...regForm, department: e.target.value })}
+                      value={otpForm.otp}
+                      onChange={e => setOtpForm({ ...otpForm, otp: e.target.value })}
                       required
+                      sx={{ mb: 3 }}
                     />
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      fullWidth
+                      sx={{ mt: 1, mb: 2, py: 1.5, fontSize: '1rem' }}
+                    >
+                      Verify OTP
+                    </Button>
                   </Box>
-                  
-                  <TextField
-                    label="Password"
-                    name="password"
-                    type="password"
-                    fullWidth
-                    margin="normal"
-                    value={regForm.password}
-                    onChange={e => setRegForm({ ...regForm, password: e.target.value })}
-                    required
-                  />
-                  
-                  <TextField
-                    label="Confirm Password"
-                    name="confirmPassword"
-                    type="password"
-                    fullWidth
-                    margin="normal"
-                    value={regForm.confirmPassword}
-                    onChange={e => setRegForm({ ...regForm, confirmPassword: e.target.value })}
-                    required
-                    sx={{ mb: 2 }}
-                  />
-                  
-                  <Button 
-                    type="submit" 
-                    variant="contained" 
-                    fullWidth 
-                    sx={{ 
-                      mt: 2, 
-                      mb: 2,
-                      py: 1.5,
-                      fontSize: '1rem'
-                    }}
-                  >
-                    Register
-                  </Button>
-                </Box>
-              )}
+                )}
 
-              {regStep === 'otp' && (
-                <Box component="form" onSubmit={handleOtpSubmit}>
-                  <Typography align="center" sx={{ mb: 2 }}>
-                    Enter the OTP sent to {otpForm.email}
-                  </Typography>
-                  <TextField
-                    label="OTP Code"
-                    name="otp"
-                    fullWidth
-                    margin="normal"
-                    value={otpForm.otp}
-                    onChange={e => setOtpForm({ ...otpForm, otp: e.target.value })}
-                    required
-                    sx={{ mb: 3 }}
-                  />
-                  <Button 
-                    type="submit" 
-                    variant="contained" 
-                    fullWidth 
-                    sx={{ 
-                      mt: 1, 
-                      mb: 2,
-                      py: 1.5,
-                      fontSize: '1rem'
-                    }}
-                  >
-                    Verify OTP
-                  </Button>
-                </Box>
-              )}
+                {regStep === 'completed' && (
+                  <Box sx={{ textAlign: 'center', py: 4 }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: 'success.main' }}>
+                      Registration Complete!
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 3 }}>
+                      Your account has been created successfully.
+                    </Typography>
+                    <Button onClick={() => setTab(0)} variant="contained" sx={{ px: 4 }}>
+                      Go to Login
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Paper>
 
-              {regStep === 'completed' && (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <Typography variant="h6" sx={{ mb: 2, color: 'success.main' }}>
-                    Registration Complete!
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 3 }}>
-                    Your account has been created successfully.
-                  </Typography>
-                  <Button 
-                    onClick={() => setTab(0)} 
-                    variant="contained" 
-                    sx={{ px: 4 }}
-                  >
-                    Go to Login
-                  </Button>
-                </Box>
-              )}
-            </Box>
-          )}
-        </Paper>
-        
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
-          Store NC Document Control System © {new Date().getFullYear()}
-        </Typography>
-      </Box>
-    </Container>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
+            Store NC Document Control System © {new Date().getFullYear()}
+          </Typography>
+        </Box>
+      </Container>
+    </>
   );
 }

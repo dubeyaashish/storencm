@@ -1,5 +1,6 @@
 // client/src/pages/InventoryDashboard.js
 import React, { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet';
 import {
   Box,
   Typography,
@@ -212,6 +213,11 @@ export default function InventoryDashboard() {
   }
 
   return (
+    <>
+        <Helmet>
+              <title>Inventory</title>
+        </Helmet>
+
     <Box sx={{ p:3 }}>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
@@ -508,5 +514,6 @@ export default function InventoryDashboard() {
         <Alert severity={notification.severity}>{notification.message}</Alert>
       </Snackbar>
     </Box>
+    </>
   );
 }

@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 
+
 // Pages & Components
 import Login                from './pages/Login';
 import SaleCoDashboard      from './pages/SaleCoDashboard';
@@ -237,7 +238,7 @@ function App() {
                 path="/"
                 element={
                   isAuth
-                    ? <Navigate to={`/${localStorage.getItem('role')?.toLowerCase() || 'login'}`} replace />
+                    ? <Navigate to={`/${localStorage.getItem('role')?.toLowerCase()}`} replace />
                     : <Navigate to="/login" replace />
                 }
               />

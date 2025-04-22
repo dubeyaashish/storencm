@@ -56,6 +56,10 @@ const authenticateJWT = (req, res, next) => {
  */
 const authorizeRoles = (allowedRoles) => {
   return (req, res, next) => {
+    console.log('Route Authorization Check');
+    console.log('Allowed Roles:', allowedRoles);
+    console.log('Current User Role:', req.user?.role);
+
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized. Authentication required.' });
     }
@@ -63,8 +67,11 @@ const authorizeRoles = (allowedRoles) => {
     if (allowedRoles.includes(req.user.role)) {
       next();
     } else {
+      console.warn(`Access Denied: Role ${req.user.role} not in ${allowedRoles}`);
       res.status(403).json({ 
-        message: 'Forbidden. You do not have permission to access this resource.' 
+        message: 'Forbidden. You do not have permission to access this resource.',
+        userRole: req.user.role,
+        requiredRoles: allowedRoles
       });
     }
   };

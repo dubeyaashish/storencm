@@ -1,5 +1,6 @@
 // client/src/pages/QADashboard.js
 import React, { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet';
 import {
   Box,
   Typography,
@@ -298,6 +299,11 @@ export default function QADashboard() {
   }
 
   return (
+    <>
+    {/* 1) Helmet goes here */}
+    <Helmet>
+      <title>QA</title>
+    </Helmet>
     <Box sx={{ p:3 }}>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
@@ -678,5 +684,6 @@ export default function QADashboard() {
         <Alert severity={notification.severity}>{notification.message}</Alert>
       </Snackbar>
     </Box>
+    </>
   );
 }
