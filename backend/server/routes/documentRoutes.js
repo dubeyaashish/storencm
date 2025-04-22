@@ -81,4 +81,18 @@ router.get(
   dc.getByDocumentId
 );
 
+router.post(
+  '/:id/accept-manufacturing',
+  authenticateJWT,
+  authorizeRoles(['Manufacturing']),
+  dc.acceptManufacturing
+);
+
+router.post(
+  '/:id/accept-environment',
+  authenticateJWT,
+  authorizeRoles(['Environment']),
+  dc.acceptEnvironment
+);
+
 module.exports = router;

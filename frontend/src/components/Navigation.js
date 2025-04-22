@@ -176,15 +176,13 @@ const HeaderIconButton = styled(IconButton)(({ theme }) => ({
 }));
 
 const LogoImage = styled('img')(({ theme }) => ({
-  height: 48,          // bump up the size
-  width: 48,           // keep it square
-  borderRadius: '50%', // make it a perfect circle
-  objectFit: 'cover',  // ensure it fills the circle nicely
+  height: 48,
+  width: 48,
+  borderRadius: '50%',
+  objectFit: 'cover',
   marginRight: theme.spacing(2),
   cursor: 'pointer',
 }));
-
-
 
 // Main component
 const Navigation = () => {
@@ -240,6 +238,10 @@ const Navigation = () => {
       setOpenSections(prev => ({ ...prev, qa: true }));
     } else if (currentPath.includes('/inventory')) {
       setOpenSections(prev => ({ ...prev, inventory: true }));
+    } else if (currentPath.includes('/manufacturing')) {
+      setOpenSections(prev => ({ ...prev, manufacturing: true }));
+    } else if (currentPath.includes('/environment')) {
+      setOpenSections(prev => ({ ...prev, environment: true }));
     }
   }, [location.pathname]);
 
@@ -278,7 +280,7 @@ const Navigation = () => {
         { text: 'Dashboard', path: '/saleco', icon: <SpeedIcon /> },
         { text: 'Create Document', path: '/saleco/create', icon: <NoteAddIcon /> },
       ],
-      roles: ['SaleCo'] // Only show for SaleCo role
+      roles: ['SaleCo']
     },
     {
       id: 'qa',
@@ -288,7 +290,7 @@ const Navigation = () => {
         { text: 'Dashboard', path: '/qa', icon: <SpeedIcon /> },
         { text: 'Review Documents', path: '/qa/review', icon: <ArticleIcon /> },
       ],
-      roles: ['QA'] // Only show for QA role
+      roles: ['QA']
     },
     {
       id: 'inventory',
@@ -298,7 +300,7 @@ const Navigation = () => {
         { text: 'Dashboard', path: '/inventory', icon: <SpeedIcon /> },
         { text: 'Inventory List', path: '/inventory/list', icon: <InventoryIcon /> },
       ],
-      roles: ['Inventory'] // Only show for Inventory role
+      roles: ['Inventory']
     },
     {
       id: 'manufacturing',
@@ -308,7 +310,7 @@ const Navigation = () => {
         { text: 'Dashboard', path: '/manufacturing', icon: <SpeedIcon /> },
         { text: 'Manufacturing List', path: '/manufacturing/list', icon: <Factory /> },
       ],
-      roles: ['Manufacturing'] // Only show for Manufacturing role
+      roles: ['Manufacturing']
     },
     {
       id: 'environment',
@@ -318,7 +320,7 @@ const Navigation = () => {
         { text: 'Dashboard', path: '/environment', icon: <SpeedIcon /> },
         { text: 'Environment List', path: '/environment/list', icon: <Nature /> },
       ],
-      roles: ['Environment'] // Only show for Environment role
+      roles: ['Environment']
     }
   ];
 
@@ -350,10 +352,9 @@ const Navigation = () => {
         justifyContent: 'center',
         padding: theme.spacing(3, 2) 
       }}>
-      <Link to="/">
-        <LogoImage src={logo} alt="Logo" />
-      </Link>
-
+        <Link to="/">
+          <LogoImage src={logo} alt="Logo" />
+        </Link>
       </Box>
       
       <Divider sx={{ opacity: 0.1, mx: 2, mb: 3 }} />      
@@ -480,10 +481,9 @@ const Navigation = () => {
             </IconButton>
             
             <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', flexGrow: 1 }}>
-            <Link to="/">
-              <LogoImage src={logo} alt="Logo" />
-            </Link>
-
+              <Link to="/">
+                <LogoImage src={logo} alt="Logo" />
+              </Link>
               
               {/* Role indicator */}
               {userRole && (
@@ -496,10 +496,9 @@ const Navigation = () => {
             </Box>
             
             <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
-            <Link to="/">
-              <LogoImage src={logo} alt="Logo" />
-            </Link>
-
+              <Link to="/">
+                <LogoImage src={logo} alt="Logo" />
+              </Link>
             </Box>
             
             {/* Right section: notifications, search, and user menu */}
@@ -527,7 +526,7 @@ const Navigation = () => {
                 </HeaderIconButton>
               </Tooltip>
               
-              
+              {/* User Menu */}
               <Menu
                 id="menu-appbar"
                 anchorEl={anchorEl}
@@ -660,5 +659,3 @@ const Navigation = () => {
 };
 
 export default Navigation;
-
-

@@ -168,7 +168,7 @@ function App() {
                 }
               />
 
-              {/* QA & Inventory dashboards */}
+              {/* QA dashboard */}
               <Route
                 path="/qa"
                 element={
@@ -178,6 +178,8 @@ function App() {
                   />
                 }
               />
+
+              {/* Inventory dashboard */}
               <Route
                 path="/inventory"
                 element={
@@ -188,7 +190,29 @@ function App() {
                 }
               />
 
-              {/* Two “view” routes so both patterns work */}
+              {/* Manufacturing dashboard */}
+              <Route
+                path="/manufacturing"
+                element={
+                  <ProtectedRoute
+                    element={<ManufacturingDashboard />}
+                    allowedRoles={['Manufacturing']}
+                  />
+                }
+              />
+
+              {/* Environment dashboard */}
+              <Route
+                path="/environment"
+                element={
+                  <ProtectedRoute
+                    element={<EnvironmentDashboard />}
+                    allowedRoles={['Environment']}
+                  />
+                }
+              />
+
+              {/* Two "view" routes so both patterns work */}
               <Route
                 path="/saleco/view/:documentId"
                 element={
@@ -203,25 +227,7 @@ function App() {
                 element={
                   <ProtectedRoute
                     element={<DocumentView />}
-                    allowedRoles={['SaleCo','QA','Inventory']}
-                  />
-                }
-              />
-              <Route
-                path="/manufacturing"
-                element={
-                  <ProtectedRoute
-                    element={<ManufacturingDashboard />}
-                    allowedRoles={['Manufacturing']}
-                  />
-                }
-              />
-              <Route
-                path="/environment"
-                element={
-                  <ProtectedRoute
-                    element={<EnvironmentDashboard />}
-                    allowedRoles={['Environment']}
+                    allowedRoles={['SaleCo','QA','Inventory','Manufacturing','Environment']}
                   />
                 }
               />
@@ -231,7 +237,7 @@ function App() {
                 path="/"
                 element={
                   isAuth
-                    ? <Navigate to={`/${localStorage.getItem('role')?.toLowerCase()}`} replace />
+                    ? <Navigate to={`/${localStorage.getItem('role')?.toLowerCase() || 'login'}`} replace />
                     : <Navigate to="/login" replace />
                 }
               />

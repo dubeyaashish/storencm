@@ -227,3 +227,49 @@ exports.getByDocumentId = (req, res) => {
     }
   );
 };
+
+exports.acceptManufacturing = (req, res) => {
+  const id   = +req.params.id;
+  const name = req.user.name;
+  db.pool.query(
+    `
+    UPDATE documents_nc
+    SET
+      status = 'Accepted by Manufacture',
+      ManufacturingName = ?,
+      ManufacturingTimeStamp = NOW()
+    WHERE id = ?
+    `,
+    [name, id],
+    (err) => {
+      if (err) {
+        console.error('[acceptManufacturing] DB error:', err);
+        return res.status(500).json({ message: err.message });
+      }
+      res.json({ message: 'Accepted by Manufacturing' });
+    }
+  );
+};
+
+exports.acceptEnvironment = (req, res) => {
+  const id   = +req.params.id;
+  const name = req.user.name;
+  db.pool.query(
+    `
+    UPDATE documents_nc
+    SET
+      status = 'Accepted by Environment',
+      EnvironmentName = ?,
+      EnvironmentTimeStamp = NOW()
+    WHERE id = ?
+    `,
+    [name, id],
+    (err) => {
+      if (err) {
+        console.error('[acceptEnvironment] DB error:', err);
+        return res.status(500).json({ message: err.message });
+      }
+      res.json({ message: 'Accepted by Environment' });
+    }
+  );
+};
