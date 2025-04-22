@@ -10,6 +10,7 @@ const cors       = require('cors');
 const fs         = require('fs');
 const authRoutes     = require('./routes/authRoutes');
 const documentRoutes = require('./routes/documentRoutes');
+const erpRoutes      = require('./routes/erpRoutes'); // Add this line
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use(bodyParser.json());
 app.use('/api/auth',      authRoutes);
 app.use('/uploads', express.static(uploadsDir));
 app.use('/api/documents', documentRoutes);
+app.use('/api/erp',       erpRoutes); // Add this line
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => console.log(`Server running on port ${port}`));

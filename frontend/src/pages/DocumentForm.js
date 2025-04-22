@@ -1,5 +1,5 @@
 // client/src/pages/DocumentForm.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -14,14 +14,21 @@ import {
   Snackbar,
   Stack,
   MenuItem,
-  useTheme
+  useTheme,
+  Autocomplete,
+  debounce
 } from '@mui/material';
 import { PhotoCamera, CheckCircleOutline } from '@mui/icons-material';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 const steps = ['Product Info', 'Issue Details', 'Attachments', 'Confirm'];
-const PRODUCT_TYPES = ['Type A', 'Type B', 'Type C', 'Type D', 'Type E'];
+const PRODUCT_TYPES = [
+  'วัตถุดิบ',
+  'ระหว่างกระบวนการผลิต',
+  'ผลิตภัณฑ์สำเร็จรูป',
+  'อื่นๆ'
+];
 const DEPARTMENTS = ['R&D', 'Production', 'Quality Control', 'Sales', 'Marketing', 'Logistics'];
 
 export default function DocumentForm() {
@@ -32,8 +39,8 @@ export default function DocumentForm() {
   const [formData, setFormData] = useState({
     productType: '',
     productId: '',
-    snNumber: '',         // ← new
-    description: '',      // ← new
+    snNumber: '',
+    description: '',
     lotNo: '',
     size: '',
     quantity: '',
@@ -48,11 +55,55 @@ export default function DocumentForm() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState({ open: false, message: '', severity: 'success' });
+  
+  // Autocomplete states
+  const [erpItems, setErpItems] = useState([]);
+  const [erpLoading, setErpLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  // Fetch ERP items based on search query
+  const fetchERPItems = React.useMemo(
+    () =>
+      debounce(async (query) => {
+        if (query.length < 2) {
+          setErpItems([]);
+          return;
+        }
+        
+        setErpLoading(true);
+        try {
+          const response = await axios.get(`/api/erp/items?query=${query}`);
+          setErpItems(response.data);
+        } catch (error) {
+          console.error('Error fetching ERP items:', error);
+        } finally {
+          setErpLoading(false);
+        }
+      }, 300),
+    []
+  );
 
   const handleChange = e => {
     const { name, value, files } = e.target;
     setFormData(prev => ({ ...prev, [name]: files ? files[0] : value }));
     setErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const handleAutocompleteChange = (event, newValue) => {
+    setSelectedItem(newValue);
+    if (newValue) {
+      setFormData(prev => ({
+        ...prev,
+        productId: newValue.itemId,
+        description: newValue.description
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        productId: '',
+        description: ''
+      }));
+    }
   };
 
   const validateStep = step => {
@@ -85,7 +136,6 @@ export default function DocumentForm() {
   const handleSubmit = async () => {
     setLoading(true);
     const payload = new FormData();
-    // append every field (files and text)
     Object.entries(formData).forEach(([k, v]) => {
       if (v !== null && v !== '') {
         payload.append(k, v);
@@ -117,9 +167,13 @@ export default function DocumentForm() {
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
               <TextField
-                select label="Product Type" name="productType"
-                value={formData.productType} onChange={handleChange}
-                error={!!errors.productType} helperText={errors.productType}
+                select
+                label="Product Type / ประเภทสินค้า"
+                name="productType"
+                value={formData.productType}
+                onChange={handleChange}
+                error={!!errors.productType}
+                helperText={errors.productType}
                 {...common}
               >
                 {PRODUCT_TYPES.map(pt => (
@@ -129,53 +183,96 @@ export default function DocumentForm() {
             </Grid>
 
             <Grid item xs={12} md={6}>
+              <Autocomplete
+                options={erpItems}
+                getOptionLabel={(option) => option ? option.itemId : ''}
+                loading={erpLoading}
+                value={selectedItem}
+                onChange={handleAutocompleteChange}
+                onInputChange={(event, newInputValue) => {
+                  fetchERPItems(newInputValue);
+                }}
+                isOptionEqualToValue={(option, value) => option.itemId === value.itemId}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Product ID / รหัสสินค้า"
+                    error={!!errors.productId}
+                    helperText={errors.productId || "Type to search Product ID or Description"}
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {erpLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <li {...props}>
+                    <div>
+                      <strong>{option.itemId}</strong>
+                      <br />
+                      <span style={{ fontSize: '0.85em', color: 'gray' }}>{option.description}</span>
+                    </div>
+                  </li>
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
               <TextField
-                label="Product ID" name="productId"
-                value={formData.productId} onChange={handleChange}
-                error={!!errors.productId} helperText={errors.productId}
+                label="Serial Number"
+                name="snNumber"
+                value={formData.snNumber}
+                onChange={handleChange}
                 {...common}
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <TextField
-                label="Serial Number" name="snNumber"
-                value={formData.snNumber} onChange={handleChange}
+                label="Description / รายละเอียด"
+                name="description"
+                value={formData.description}
+                InputProps={{ readOnly: true }}
                 {...common}
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <TextField
-                label="Lot Number" name="lotNo"
-                value={formData.lotNo} onChange={handleChange}
-                error={!!errors.lotNo} helperText={errors.lotNo}
-                {...common}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                label="Description" name="description"
-                multiline rows={2}
-                value={formData.description} onChange={handleChange}
+                label="Lot Number"
+                name="lotNo"
+                value={formData.lotNo}
+                onChange={handleChange}
+                error={!!errors.lotNo}
+                helperText={errors.lotNo}
                 {...common}
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <TextField
-                label="Size" name="size"
-                value={formData.size} onChange={handleChange}
+                label="Size"
+                name="size"
+                value={formData.size}
+                onChange={handleChange}
                 {...common}
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <TextField
-                label="Quantity" name="quantity" type="number"
-                value={formData.quantity} onChange={handleChange}
-                error={!!errors.quantity} helperText={errors.quantity}
+                label="Quantity"
+                name="quantity"
+                type="number"
+                value={formData.quantity}
+                onChange={handleChange}
+                error={!!errors.quantity}
+                helperText={errors.quantity}
                 InputProps={{ inputProps: { min: 1 } }}
                 {...common}
               />
@@ -187,27 +284,39 @@ export default function DocumentForm() {
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <TextField
-                label="Issue Found" name="issueFound" multiline rows={2}
-                value={formData.issueFound} onChange={handleChange}
-                error={!!errors.issueFound} helperText={errors.issueFound}
+                label="Issue Found"
+                name="issueFound"
+                multiline
+                rows={2}
+                value={formData.issueFound}
+                onChange={handleChange}
+                error={!!errors.issueFound}
+                helperText={errors.issueFound}
                 {...common}
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <TextField
-                label="Foundee Name" name="foundeeName"
-                value={formData.foundeeName} onChange={handleChange}
-                error={!!errors.foundeeName} helperText={errors.foundeeName}
+                label="Foundee Name"
+                name="foundeeName"
+                value={formData.foundeeName}
+                onChange={handleChange}
+                error={!!errors.foundeeName}
+                helperText={errors.foundeeName}
                 {...common}
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <TextField
-                select label="Department" name="department"
-                value={formData.department} onChange={handleChange}
-                error={!!errors.department} helperText={errors.department}
+                select
+                label="Department"
+                name="department"
+                value={formData.department}
+                onChange={handleChange}
+                error={!!errors.department}
+                helperText={errors.department}
                 {...common}
               >
                 {DEPARTMENTS.map(d => (
@@ -218,18 +327,28 @@ export default function DocumentForm() {
 
             <Grid item xs={12}>
               <TextField
-                label="What Happened" name="whatHappened" multiline rows={3}
-                value={formData.whatHappened} onChange={handleChange}
-                error={!!errors.whatHappened} helperText={errors.whatHappened}
+                label="What Happened"
+                name="whatHappened"
+                multiline
+                rows={3}
+                value={formData.whatHappened}
+                onChange={handleChange}
+                error={!!errors.whatHappened}
+                helperText={errors.whatHappened}
                 {...common}
               />
             </Grid>
 
             <Grid item xs={12}>
               <TextField
-                label="Prevention Measure" name="preventionMeasure" multiline rows={3}
-                value={formData.preventionMeasure} onChange={handleChange}
-                error={!!errors.preventionMeasure} helperText={errors.preventionMeasure}
+                label="Prevention Measure"
+                name="preventionMeasure"
+                multiline
+                rows={3}
+                value={formData.preventionMeasure}
+                onChange={handleChange}
+                error={!!errors.preventionMeasure}
+                helperText={errors.preventionMeasure}
                 {...common}
               />
             </Grid>
@@ -241,7 +360,9 @@ export default function DocumentForm() {
             {['picture1', 'picture2'].map((name, idx) => (
               <Grid item xs={12} md={6} key={name}>
                 <Button
-                  variant="outlined" component="label" fullWidth
+                  variant="outlined"
+                  component="label"
+                  fullWidth
                   startIcon={<PhotoCamera />}
                   sx={{ height: '56px', borderColor: theme.palette.primary.main }}
                 >
@@ -265,9 +386,35 @@ export default function DocumentForm() {
               Review your entries:
             </Typography>
             <Paper variant="outlined" sx={{ p: 2 }}>
-              <pre style={{ margin: 0, fontFamily: 'inherit' }}>
-                {JSON.stringify(formData, null, 2)}
-              </pre>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Typography variant="body2"><strong>Product Type:</strong> {formData.productType}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2"><strong>Product ID:</strong> {formData.productId}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2"><strong>Serial #:</strong> {formData.snNumber}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2"><strong>Description:</strong> {formData.description}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2"><strong>Lot No:</strong> {formData.lotNo}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2"><strong>Quantity:</strong> {formData.quantity}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2"><strong>Issue Found:</strong> {formData.issueFound}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2"><strong>What Happened:</strong> {formData.whatHappened}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2"><strong>Prevention Measure:</strong> {formData.preventionMeasure}</Typography>
+                </Grid>
+              </Grid>
             </Paper>
           </Box>
         );
