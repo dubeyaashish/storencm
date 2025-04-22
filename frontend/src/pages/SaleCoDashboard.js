@@ -16,7 +16,18 @@ import {
   InputAdornment,
   IconButton,
   Snackbar,
-  Tooltip
+  Tooltip,
+  ToggleButtonGroup,
+  ToggleButton,
+  TableContainer,
+  Paper,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Pagination,
+  Stack
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import {
@@ -25,7 +36,9 @@ import {
   Visibility as VisibilityIcon,
   Delete as DeleteIcon,
   CalendarToday as CalendarIcon,
-  Description as DescriptionIcon
+  Description as DescriptionIcon,
+  GridView as GridViewIcon,
+  ViewList as ViewListIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -48,8 +61,13 @@ const SaleCoDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
-
+  
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [rowsPerPage] = useState(9); // 9 for grid (3x3), 10 for table
+  
   // Fetch documents on component mount
   useEffect(() => {
     fetchDocuments();
@@ -166,12 +184,24 @@ const SaleCoDashboard = () => {
   // Handle search input change
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
+    setPage(1); // Reset to first page when searching
   };
 
   // Close notification
   const handleCloseNotification = () => {
     setNotification({ ...notification, open: false });
   };
+
+  // Handle page change
+  const handlePageChange = (event, value) => {
+    setPage(value);
+  };
+
+  // Calculate current documents to display
+  const currentDocs = filteredDocs.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  );
 
   // Render loading state
   if (loading) {
@@ -186,7 +216,7 @@ const SaleCoDashboard = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      {/* Header with search and create button */}
+      {/* Header with search, view toggle, and create button */}
       <Box 
         display="flex" 
         justifyContent="space-between" 
@@ -197,7 +227,7 @@ const SaleCoDashboard = () => {
       >
         <Typography variant="h5">Documents</Typography>
         
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <TextField
             placeholder="Search documents..."
             size="small"
@@ -212,6 +242,16 @@ const SaleCoDashboard = () => {
               )
             }}
           />
+          
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => v && setViewMode(v)}
+            size="small"
+          >
+            <ToggleButton value="grid"><GridViewIcon /></ToggleButton>
+            <ToggleButton value="table"><ViewListIcon /></ToggleButton>
+          </ToggleButtonGroup>
         </Box>
       </Box>
 
@@ -229,129 +269,205 @@ const SaleCoDashboard = () => {
         </Alert>
       )}
 
-      {/* Documents grid */}
-      <Grid container spacing={2}>
-        {filteredDocs.map((doc) => (
-          <Grid item xs={12} md={6} lg={4} key={doc.id}>
-            <Card 
-              sx={{ 
-                height: '100%', 
-                display: 'flex', 
-                flexDirection: 'column',
-                transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                '&:hover': {
-                  transform: 'translateY(-5px)',
-                  boxShadow: 3
-                }
-              }}
-            >
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
-                  <Typography variant="h6" component="div">
-                    {doc.Document_id || `Document #${doc.id}`}
-                  </Typography>
-                  <Chip 
-                    label={doc.status} 
-                    color={statusColors[doc.status] || 'default'} 
-                    size="small"
-                  />
-                </Box>
-                
-                <Box display="flex" alignItems="center" mb={1}>
-                  <CalendarIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                  <Typography variant="body2" color="text.secondary">
-                    {formatDate(doc.date)}
-                  </Typography>
-                </Box>
-                
-                <Divider sx={{ my: 1 }} />
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Product ID:</strong> {doc.Product_id || 'N/A'}
-                </Typography>
-
-                <Typography variant="body2" gutterBottom>
-                  <strong>Description:</strong> {doc.Description || 'N/A'}
-                </Typography>
-                <Typography variant="body2" gutterBottom>
-                  <strong>Lot No:</strong> {doc.Lot_No || 'N/A'}
-                </Typography>
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Size:</strong> {doc.Product_size || 'N/A'}
-                </Typography>
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Quantity:</strong> {doc.Quantity || 'N/A'}
-                </Typography>
-                
-                <Divider sx={{ my: 1 }} />
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Issue:</strong> {truncateText(doc.Issue_Found, 50) || 'N/A'}
-                </Typography>
-                
-                <Tooltip title={doc.Issue_Description || 'No description'}>
-                  <Typography variant="body2" gutterBottom sx={{ cursor: 'help' }}>
-                    <strong>Issue Description:</strong> {truncateText(doc.Issue_Description, 70) || 'N/A'}
-                  </Typography>
-                </Tooltip>
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Foundee:</strong> {doc.Foundee || 'N/A'}
-                </Typography>
-                
-                <Typography variant="body2" gutterBottom>
-                  <strong>Department:</strong> {doc.Department || 'N/A'}
-                </Typography>
-                
-                {doc.QAName && (
-                  <>
-                    <Divider sx={{ my: 1 }} />
-                    <Typography variant="body2" color="text.secondary">
-                      <strong>QA Accepted By:</strong> {doc.QAName} 
-                      {doc.QATimeStamp && ` (${formatDate(doc.QATimeStamp)})`}
+      {/* Grid View */}
+      {viewMode === 'grid' && currentDocs.length > 0 && (
+        <Grid container spacing={2}>
+          {currentDocs.map((doc) => (
+            <Grid item xs={12} md={6} lg={4} key={doc.id}>
+              <Card 
+                sx={{ 
+                  height: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'translateY(-5px)',
+                    boxShadow: 3
+                  }
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                    <Typography variant="h6" component="div">
+                      {doc.Document_id || `Document #${doc.id}`}
                     </Typography>
-                  </>
-                )}
-                
-                {doc.InventoryName && (
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Inventory Accepted By:</strong> {doc.InventoryName}
-                    {doc.InventoryTimeStamp && ` (${formatDate(doc.InventoryTimeStamp)})`}
+                    <Chip 
+                      label={doc.status} 
+                      color={statusColors[doc.status] || 'default'} 
+                      size="small"
+                    />
+                  </Box>
+                  
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <CalendarIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      {formatDate(doc.date)}
+                    </Typography>
+                  </Box>
+                  
+                  <Divider sx={{ my: 1 }} />
+                  
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Product ID:</strong> {doc.Product_id || 'N/A'}
                   </Typography>
-                )}
-              </CardContent>
-              
-              <CardActions sx={{ justifyContent: 'flex-end', p: 1 }}>
-                <Tooltip title="View details">
-                  <IconButton 
-                    size="small" 
-                    component={RouterLink} 
-                    to={`/saleco/view/${doc.Document_id}`}
-                    color="primary"
-                  >
-                    <VisibilityIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Description:</strong> {doc.Description || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Lot No:</strong> {doc.Lot_No || 'N/A'}
+                  </Typography>
+                  
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Size:</strong> {doc.Product_size || 'N/A'}
+                  </Typography>
+                  
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Quantity:</strong> {doc.Quantity || 'N/A'}
+                  </Typography>
+                  
+                  <Divider sx={{ my: 1 }} />
+                  
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Issue:</strong> {truncateText(doc.Issue_Found, 50) || 'N/A'}
+                  </Typography>
+                  
+                  <Tooltip title={doc.Issue_Description || 'No description'}>
+                    <Typography variant="body2" gutterBottom sx={{ cursor: 'help' }}>
+                      <strong>Issue Description:</strong> {truncateText(doc.Issue_Description, 70) || 'N/A'}
+                    </Typography>
+                  </Tooltip>
+                  
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Foundee:</strong> {doc.Foundee || 'N/A'}
+                  </Typography>
+                  
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Department:</strong> {doc.Department || 'N/A'}
+                  </Typography>
+                  
+                  {doc.QAName && (
+                    <>
+                      <Divider sx={{ my: 1 }} />
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>QA Accepted By:</strong> {doc.QAName} 
+                        {doc.QATimeStamp && ` (${formatDate(doc.QATimeStamp)})`}
+                      </Typography>
+                    </>
+                  )}
+                  
+                  {doc.InventoryName && (
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Inventory Accepted By:</strong> {doc.InventoryName}
+                      {doc.InventoryTimeStamp && ` (${formatDate(doc.InventoryTimeStamp)})`}
+                    </Typography>
+                  )}
+                </CardContent>
                 
-                <Tooltip title="Delete document">
-                  <span>
+                <CardActions sx={{ justifyContent: 'flex-end', p: 1 }}>
+                  <Tooltip title="View details">
                     <IconButton 
                       size="small" 
-                      onClick={() => handleDelete(doc.id)}
-                      color="error"
-                      disabled={doc.status !== 'Created'}
+                      component={RouterLink} 
+                      to={`/view/${doc.Document_id}`}
+                      color="primary"
                     >
-                      <DeleteIcon fontSize="small" />
+                      <VisibilityIcon fontSize="small" />
                     </IconButton>
-                  </span>
-                </Tooltip>
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+                  </Tooltip>
+                  
+                  <Tooltip title="Delete document">
+                    <span>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDelete(doc.id)}
+                        color="error"
+                        disabled={doc.status !== 'Created'}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
+
+      {/* Table View */}
+      {viewMode === 'table' && currentDocs.length > 0 && (
+        <TableContainer component={Paper} sx={{ mt: 2 }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Doc #</TableCell>
+                <TableCell>Product ID</TableCell>
+                <TableCell>Lot No</TableCell>
+                <TableCell>Quantity</TableCell>
+                <TableCell>Issue</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Date</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {currentDocs.map((doc) => (
+                <TableRow key={doc.id} hover>
+                  <TableCell>{doc.Document_id}</TableCell>
+                  <TableCell>{doc.Product_id}</TableCell>
+                  <TableCell>{doc.Lot_No}</TableCell>
+                  <TableCell>{doc.Quantity}</TableCell>
+                  <TableCell>{truncateText(doc.Issue_Found, 40)}</TableCell>
+                  <TableCell>
+                    <Chip label={doc.status} color={statusColors[doc.status] || 'default'} />
+                  </TableCell>
+                  <TableCell>{formatDate(doc.date)}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1}>
+                      <Tooltip title="View details">
+                        <IconButton 
+                          size="small"
+                          component={RouterLink} 
+                          to={`/view/${doc.Document_id}`}
+                        >
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete document">
+                        <span>
+                          <IconButton 
+                            size="small"
+                            onClick={() => handleDelete(doc.id)}
+                            color="error"
+                            disabled={doc.status !== 'Created'}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* Pagination */}
+      {filteredDocs.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination 
+            count={Math.ceil(filteredDocs.length / rowsPerPage)} 
+            page={page} 
+            onChange={handlePageChange}
+            color="primary"
+            showFirstButton 
+            showLastButton
+          />
+        </Box>
+      )}
       
       {/* Notification */}
       <Snackbar

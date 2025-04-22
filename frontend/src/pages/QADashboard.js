@@ -32,7 +32,8 @@ import {
   TableRow,
   TableCell,
   Tooltip,
-  Stack
+  Stack,
+  Pagination
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -71,6 +72,10 @@ export default function QADashboard() {
   const [viewMode, setViewMode] = useState('grid');
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
   const [stats, setStats] = useState({ total: 0, created: 0, accepted: 0, completed: 0, toManufacture: 0, toEnvironment: 0 });
+
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [rowsPerPage] = useState(9); // 9 for grid (3x3), 10 for table
 
   // Dialog & form
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -155,6 +160,7 @@ export default function QADashboard() {
       );
     }
     setFilteredDocs(fd);
+    setPage(1); // Reset to first page when filters change
   }, [docs, tabValue, searchTerm]);
 
   // Format date function
@@ -173,6 +179,17 @@ export default function QADashboard() {
     if (!text) return "N/A";
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
+
+  // Handle page change
+  const handlePageChange = (event, value) => {
+    setPage(value);
+  };
+
+  // Calculate current documents to display
+  const currentDocs = filteredDocs.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  );
 
   // Handle immediate acceptance without showing dialog
   const handleAccept = async (doc) => {
@@ -341,9 +358,9 @@ export default function QADashboard() {
       {!error && !filteredDocs.length && <Alert severity="info">No documents.</Alert>}
 
       {/* Grid */}
-      {viewMode==='grid' ? (
+      {viewMode==='grid' && currentDocs.length > 0 && (
         <Grid container spacing={2}>
-          {filteredDocs.map(doc=>(
+          {currentDocs.map(doc=>(
             <Grid item xs={12} md={6} lg={4} key={doc.id}>
               <Card 
                 sx={{ 
@@ -487,8 +504,10 @@ export default function QADashboard() {
             </Grid>
           ))}
         </Grid>
-      ) : (
-        // Table View
+      )}
+
+      {/* Table View */}
+      {viewMode === 'table' && currentDocs.length > 0 && (
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
@@ -503,7 +522,7 @@ export default function QADashboard() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredDocs.map(doc=>(
+              {currentDocs.map(doc=>(
                 <TableRow key={doc.id} hover>
                   <TableCell>{doc.Document_id}</TableCell>
                   <TableCell>{doc.Product_id}</TableCell>
@@ -537,6 +556,20 @@ export default function QADashboard() {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+
+      {/* Pagination */}
+      {filteredDocs.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination 
+            count={Math.ceil(filteredDocs.length / rowsPerPage)} 
+            page={page} 
+            onChange={handlePageChange}
+            color="primary"
+            showFirstButton 
+            showLastButton
+          />
+        </Box>
       )}
 
       {/* Dialog for completing documents */}

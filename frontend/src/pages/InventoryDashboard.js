@@ -29,7 +29,9 @@ import {
   Button,
   Tooltip,
   useTheme,
-  alpha
+  alpha,
+  Pagination,
+  Stack
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -68,6 +70,10 @@ export default function InventoryDashboard() {
   const [tabValue, setTabValue] = useState(0);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
   const [stats, setStats] = useState({ total:0, created:0, accepted:0, completed:0, rejected:0 });
+
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [rowsPerPage] = useState(9); // 9 for grid (3x3), 10 for table
 
   // Install axios interceptors once
   useEffect(() => {
@@ -126,6 +132,7 @@ export default function InventoryDashboard() {
       );
     }
     setFilteredDocs(fd);
+    setPage(1); // Reset to first page when filters change
   }, [docs, tabValue, searchTerm]);
 
   // Async fetch function
@@ -184,6 +191,17 @@ export default function InventoryDashboard() {
     }
   };
 
+  // Handle page change
+  const handlePageChange = (event, value) => {
+    setPage(value);
+  };
+
+  // Calculate current documents to display
+  const currentDocs = filteredDocs.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  );
+
   if (loading) {
     return (
       <Box sx={{ p:3, textAlign:'center' }}>
@@ -225,70 +243,69 @@ export default function InventoryDashboard() {
       </Box>
 
       {/* Stats */}
-{/* Stats - Fixed version with forced visibility */}
-<Grid container spacing={2} mb={3}>
-  {[
-    ['Total', stats.total, '#2196f3', '#e3f2fd'],
-    ['Created', stats.created, '#ff9800', '#fff3e0'],
-    ['Accepted', stats.accepted, '#9c27b0', '#f3e5f5'],
-    ['Completed', stats.completed, '#4caf50', '#e8f5e9'],
-    ['Rejected', stats.rejected, '#f44336', '#ffebee']
-  ].map(([label, value, textColor, bgColor]) => (
-    <Grid item xs={6} md={2.4} key={label}>
-      <Card
-        elevation={3}
-        sx={{
-          backgroundColor: theme.palette.mode === 'dark' 
-            ? alpha(textColor, 0.2)  // Darker theme: use semi-transparent color
-            : bgColor,               // Light theme: use light background
-          border: `1px solid ${textColor}`,
-          boxShadow: `0 2px 8px rgba(0, 0, 0, 0.1)`,
-          transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-          overflow: 'hidden',
-          position: 'relative',
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: `0 4px 12px rgba(0, 0, 0, 0.15)`,
-          },
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '4px',
-            height: '100%',
-            backgroundColor: textColor,
-          }
-        }}
-      >
-        <CardContent sx={{ py: 1.5, textAlign: 'center' }}>
-          <Typography 
-            variant="h4" 
-            sx={{ 
-              fontWeight: 'bold', 
-              color: textColor,
-              textShadow: theme.palette.mode === 'dark' 
-                ? '0 0 10px rgba(0,0,0,0.5)' 
-                : 'none'
-            }}
-          >
-            {value}
-          </Typography>
-          <Typography 
-            variant="body2" 
-            sx={{ 
-              color: textColor,
-              opacity: 0.8,
-              fontWeight: 500
-            }}
-          >
-            {label}
-          </Typography>
-        </CardContent>
-      </Card>
-    </Grid>
-  ))}
-</Grid>
+      <Grid container spacing={2} mb={3}>
+        {[
+          ['Total', stats.total, '#2196f3', '#e3f2fd'],
+          ['Created', stats.created, '#ff9800', '#fff3e0'],
+          ['Accepted', stats.accepted, '#9c27b0', '#f3e5f5'],
+          ['Completed', stats.completed, '#4caf50', '#e8f5e9'],
+          ['Rejected', stats.rejected, '#f44336', '#ffebee']
+        ].map(([label, value, textColor, bgColor]) => (
+          <Grid item xs={6} md={2.4} key={label}>
+            <Card
+              elevation={3}
+              sx={{
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? alpha(textColor, 0.2)  // Darker theme: use semi-transparent color
+                  : bgColor,               // Light theme: use light background
+                border: `1px solid ${textColor}`,
+                boxShadow: `0 2px 8px rgba(0, 0, 0, 0.1)`,
+                transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                overflow: 'hidden',
+                position: 'relative',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: `0 4px 12px rgba(0, 0, 0, 0.15)`,
+                },
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '4px',
+                  height: '100%',
+                  backgroundColor: textColor,
+                }
+              }}
+            >
+              <CardContent sx={{ py: 1.5, textAlign: 'center' }}>
+                <Typography 
+                  variant="h4" 
+                  sx={{ 
+                    fontWeight: 'bold', 
+                    color: textColor,
+                    textShadow: theme.palette.mode === 'dark' 
+                      ? '0 0 10px rgba(0,0,0,0.5)' 
+                      : 'none'
+                  }}
+                >
+                  {value}
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    color: textColor,
+                    opacity: 0.8,
+                    fontWeight: 500
+                  }}
+                >
+                  {label}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
 
       {/* Tabs */}
       <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} sx={{ mb:2 }}>
@@ -302,7 +319,7 @@ export default function InventoryDashboard() {
       {!error && !filteredDocs.length && <Alert severity="info">No documents found.</Alert>}
 
       {/* Table View */}
-      {viewMode === 'table' && filteredDocs.length > 0 && (
+      {viewMode === 'table' && currentDocs.length > 0 && (
         <TableContainer component={Paper} sx={{ mt:2 }}>
           <Table>
             <TableHead>
@@ -317,7 +334,7 @@ export default function InventoryDashboard() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredDocs.map(doc => (
+              {currentDocs.map(doc => (
                 <TableRow key={doc.id} hover>
                   <TableCell>{doc.Document_id}</TableCell>
                   <TableCell>{doc.Product_id}</TableCell>
@@ -328,22 +345,24 @@ export default function InventoryDashboard() {
                     <Chip label={doc.status} color={statusColors[doc.status]} />
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="View details">
-                      <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
-                        <VisibilityIcon/>
-                      </IconButton>
-                    </Tooltip>
-                    {doc.status === 'Created' && (
-                      <Tooltip title="Accept document">
-                        <Button
-                          size="small"
-                          startIcon={<CheckCircleIcon />}
-                          onClick={() => handleAccept(doc)}
-                        >
-                          Accept
-                        </Button>
+                    <Stack direction="row" spacing={1}>
+                      <Tooltip title="View details">
+                        <IconButton component={RouterLink} to={`/view/${doc.Document_id}`} size="small">
+                          <VisibilityIcon fontSize="small"/>
+                        </IconButton>
                       </Tooltip>
-                    )}
+                      {doc.status === 'Created' && (
+                        <Tooltip title="Accept document">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleAccept(doc)}
+                          >
+                            <CheckCircleIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
@@ -353,9 +372,9 @@ export default function InventoryDashboard() {
       )}
 
       {/* Grid View */}
-      {viewMode === 'grid' && (
+      {viewMode === 'grid' && currentDocs.length > 0 && (
         <Grid container spacing={2}>
-          {filteredDocs.map(doc => (
+          {currentDocs.map(doc => (
             <Grid item xs={12} md={6} lg={4} key={doc.id}>
               <Card
                 sx={{
@@ -464,6 +483,20 @@ export default function InventoryDashboard() {
             </Grid>
           ))}
         </Grid>
+      )}
+
+      {/* Pagination */}
+      {filteredDocs.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination 
+            count={Math.ceil(filteredDocs.length / rowsPerPage)} 
+            page={page} 
+            onChange={handlePageChange}
+            color="primary"
+            showFirstButton 
+            showLastButton
+          />
+        </Box>
       )}
 
       {/* Snackbar */}

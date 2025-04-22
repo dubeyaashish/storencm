@@ -7,15 +7,24 @@ require('dotenv').config({
 const express    = require('express');
 const bodyParser = require('body-parser');
 const cors       = require('cors');
+const fs         = require('fs');
 const authRoutes     = require('./routes/authRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 
 const app = express();
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('Created uploads directory:', uploadsDir);
+}
+
 app.use(cors());
 app.use(bodyParser.json());
 
 app.use('/api/auth',      authRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsDir));
 app.use('/api/documents', documentRoutes);
 
 const port = process.env.PORT || 5000;

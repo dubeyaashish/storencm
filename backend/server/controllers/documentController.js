@@ -31,7 +31,8 @@ exports.createNewDocument = async (req, res) => {
       status:      'Created',
       createdBy:   req.user.userId,
 
-      Product_id:        parseInt(req.body.productId, 10),
+      // Don't parse Product_id as integer if it's meant to be a string
+      Product_id:        req.body.productId, // Keep as string if that's what your DB expects
       Sn_number:         req.body.snNumber,
       Description:       req.body.description,
       date:              new Date(),
@@ -44,10 +45,10 @@ exports.createNewDocument = async (req, res) => {
       Issue_Description: req.body.whatHappened,
       Prevention:        req.body.preventionMeasure,
 
-      Img1: req.files.picture1
+      Img1: req.files && req.files.picture1
         ? req.files.picture1[0].filename
         : null,
-      Img2: req.files.picture2
+      Img2: req.files && req.files.picture2
         ? req.files.picture2[0].filename
         : null
     };
