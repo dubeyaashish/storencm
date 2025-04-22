@@ -269,7 +269,10 @@ const SaleCoDashboard = () => {
                 <Typography variant="body2" gutterBottom>
                   <strong>Product ID:</strong> {doc.Product_id || 'N/A'}
                 </Typography>
-                
+
+                <Typography variant="body2" gutterBottom>
+                  <strong>Description:</strong> {doc.Description || 'N/A'}
+                </Typography>
                 <Typography variant="body2" gutterBottom>
                   <strong>Lot No:</strong> {doc.Lot_No || 'N/A'}
                 </Typography>

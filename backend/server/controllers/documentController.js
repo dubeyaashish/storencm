@@ -10,7 +10,7 @@ exports.createNewDocument = async (req, res) => {
     const now = new Date();
     const mm  = String(now.getMonth() + 1).padStart(2, '0');
     const yy  = String(now.getFullYear()).slice(-2);
-    const prefix = `WNC${mm}${yy}`;
+    const prefix = `WNC${yy}${mm}`;
 
     // 2) Find last sequence this month
     const [[{ last }]] = await db.pool
