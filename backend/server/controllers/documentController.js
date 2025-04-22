@@ -45,11 +45,12 @@ exports.createNewDocument = async (req, res) => {
       Issue_Description: req.body.whatHappened,
       Prevention:        req.body.preventionMeasure,
 
+      // Store full URL path instead of just filename
       Img1: req.files && req.files.picture1
-        ? req.files.picture1[0].filename
+        ? `/uploads/${req.files.picture1[0].filename}`
         : null,
       Img2: req.files && req.files.picture2
-        ? req.files.picture2[0].filename
+        ? `/uploads/${req.files.picture2[0].filename}`
         : null
     };
 
