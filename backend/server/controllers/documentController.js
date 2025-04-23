@@ -25,6 +25,20 @@ exports.createNewDocument = async (req, res) => {
       ? String(parseInt(last.slice(-4), 10) + 1).padStart(4, '0')
       : '0001';
 
+    const relative1 = req.files?.picture1?.[0]?.filename
+      ? `/uploads/${req.files.picture1[0].filename}`
+      : null;
+    const Img1 = relative1
+      ? `${req.protocol}://${req.get('host')}${relative1}`
+      : null;
+
+    const relative2 = req.files?.picture2?.[0]?.filename
+      ? `/uploads/${req.files.picture2[0].filename}`
+      : null;
+    const Img2 = relative2
+      ? `${req.protocol}://${req.get('host')}${relative2}`
+      : null;
+
     // 3) Assemble data from text fields & uploaded files
     const doc = {
       Document_id: prefix + seq,
@@ -44,14 +58,8 @@ exports.createNewDocument = async (req, res) => {
       Department:        req.body.department,
       Issue_Description: req.body.whatHappened,
       Prevention:        req.body.preventionMeasure,
-
-      // Store full URL path instead of just filename
-      Img1: req.files && req.files.picture1
-        ? `/uploads/${req.files.picture1[0].filename}`
-        : null,
-      Img2: req.files && req.files.picture2
-        ? `/uploads/${req.files.picture2[0].filename}`
-        : null
+      Img1,
+      Img2
     };
 
     // 4) Insert into DB
