@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://nc.ruu-d.com/api',
+  baseURL: '/api',
   // you can set default headers here if you like
 });
 
