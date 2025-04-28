@@ -2,19 +2,64 @@
 const express        = require('express');
 const path           = require('path');
 const multer         = require('multer');
+const fs             = require('fs');
 const { authenticateJWT, authorizeRoles } = require('../middleware/authMiddleware');
 const dc             = require('../controllers/documentController');
 
 const router = express.Router();
 
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  try {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    // Ensure write permissions (0755 = owner: rwx, group: r-x, others: r-x)
+    fs.chmodSync(uploadsDir, 0o755);
+    console.log('Created uploads directory from routes:', uploadsDir);
+  } catch (error) {
+    console.error('Error creating uploads directory from routes:', error);
+  }
+}
+
 // Multer setup: store files in /uploads
 const storage = multer.diskStorage({
-  destination: (req, file, cb) =>
-    cb(null, path.join(__dirname, '../uploads')),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + path.extname(file.originalname))
+  destination: (req, file, cb) => {
+    // Ensure directory exists before trying to write to it
+    if (!fs.existsSync(uploadsDir)) {
+      try {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+        console.log('Created uploads directory on demand in multer:', uploadsDir);
+      } catch (error) {
+        console.error('Error creating uploads directory in multer:', error);
+        return cb(error, null);
+      }
+    }
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniquePrefix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    // Keep the original file extension
+    const ext = path.extname(file.originalname);
+    cb(null, uniquePrefix + ext);
+  }
 });
-const upload = multer({ storage });
+
+// Add file filter to only allow images
+const fileFilter = (req, file, cb) => {
+  // Accept images only
+  if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+    return cb(new Error('Only image files are allowed!'), false);
+  }
+  cb(null, true);
+};
+
+const upload = multer({ 
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  }
+});
 
 // ─── Create New Document ───────────────────────────────────────────────────────
 // (SaleCo only, handles picture1 & picture2 uploads)
@@ -22,10 +67,21 @@ router.post(
   '/',
   authenticateJWT,
   authorizeRoles(['SaleCo']),
+  (req, res, next) => {
+    // Log request just before handling the upload
+    console.log('About to process file upload. Request body:', req.body);
+    console.log('Upload directory:', uploadsDir);
+    next();
+  },
   upload.fields([
     { name: 'picture1', maxCount: 1 },
     { name: 'picture2', maxCount: 1 }
   ]),
+  (req, res, next) => {
+    // Log after file processing
+    console.log('Files processed:', req.files);
+    next();
+  },
   dc.createNewDocument
 );
 

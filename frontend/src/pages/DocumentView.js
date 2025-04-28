@@ -34,8 +34,12 @@ export default function DocumentView() {
   useEffect(() => {
     axios
       .get(`/api/documents/view/${documentId}`)
-      .then(res => setDoc(res.data))
+      .then(res => {
+        console.log('Document data:', res.data);
+        setDoc(res.data);
+      })
       .catch(err => {
+        console.error('Error fetching document:', err);
         setError(err.response?.data?.message || 'Failed to load document');
       })
       .finally(() => setLoading(false));
@@ -60,6 +64,20 @@ export default function DocumentView() {
       'Rejected': 'error'
     };
     return colors[status] || 'default';
+  };
+
+  // Helper function to handle image URLs correctly
+  const getImageUrl = (imgPath) => {
+    if (!imgPath) return null;
+    
+    // If the path already starts with http(s), it's an absolute URL
+    if (imgPath.startsWith('http')) return imgPath;
+    
+    // If the path starts with a slash, it's relative to the server root
+    if (imgPath.startsWith('/')) return imgPath;
+    
+    // Otherwise, prepend with /uploads/ for relative paths
+    return `/uploads/${imgPath}`;
   };
 
   if (loading) {
@@ -149,12 +167,20 @@ export default function DocumentView() {
                       <CardMedia
                         component="img"
                         height="300"
-                        image={doc.Img1.startsWith('/') ? doc.Img1 : `/uploads/${doc.Img1}`}
+                        image={getImageUrl(doc.Img1)}
                         alt="Picture 1"
                         sx={{ objectFit: 'contain', bgcolor: 'grey.100' }}
+                        onError={(e) => {
+                          console.error('Error loading image:', doc.Img1);
+                          e.target.src = '/placeholder-image.png'; // Fallback image
+                          e.target.alt = 'Image not available';
+                        }}
                       />
                       <CardContent>
                         <Typography variant="subtitle2">Picture 1</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Image path: {doc.Img1}
+                        </Typography>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -165,12 +191,20 @@ export default function DocumentView() {
                       <CardMedia
                         component="img"
                         height="300"
-                        image={doc.Img2.startsWith('/') ? doc.Img2 : `/uploads/${doc.Img2}`}
+                        image={getImageUrl(doc.Img2)}
                         alt="Picture 2"
                         sx={{ objectFit: 'contain', bgcolor: 'grey.100' }}
+                        onError={(e) => {
+                          console.error('Error loading image:', doc.Img2);
+                          e.target.src = '/placeholder-image.png'; // Fallback image
+                          e.target.alt = 'Image not available';
+                        }}
                       />
                       <CardContent>
                         <Typography variant="subtitle2">Picture 2</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Image path: {doc.Img2}
+                        </Typography>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -242,7 +276,6 @@ export default function DocumentView() {
                   <Typography><strong>Manufacturing Accepted By:</strong> {doc.ManufacturingName || 'N/A'}</Typography>
                   <Typography><strong>Manufacturing Timestamp:</strong> {formatDate(doc.ManufacturingTimeStamp) || 'N/A'}</Typography>
                   <Typography><strong>Manufacturing Comments:</strong> {doc.ManufacturingComments || 'N/A'}</Typography>
-                  {/* Add any manufacturing-specific fields here */}
                 </>
               )}
             </Paper>
@@ -268,7 +301,6 @@ export default function DocumentView() {
                   <Typography><strong>Environment Timestamp:</strong> {formatDate(doc.EnvironmentTimeStamp) || 'N/A'}</Typography>
                   <Typography><strong>Environmental Impact:</strong> {doc.EnvironmentalImpact || 'N/A'}</Typography>
                   <Typography><strong>Mitigation Measures:</strong> {doc.MitigationMeasures || 'N/A'}</Typography>
-                  {/* Add any environment-specific fields here */}
                 </>
               )}
             </Paper>

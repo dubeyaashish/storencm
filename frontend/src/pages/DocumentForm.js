@@ -16,6 +16,7 @@ import {
   MenuItem,
   useTheme,
   Autocomplete,
+  Alert,
   debounce
 } from '@mui/material';
 import { PhotoCamera, CheckCircleOutline } from '@mui/icons-material';
@@ -56,6 +57,10 @@ export default function DocumentForm() {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState({ open: false, message: '', severity: 'success' });
   
+  // Preview states
+  const [preview1, setPreview1] = useState(null);
+  const [preview2, setPreview2] = useState(null);
+  
   // Autocomplete states
   const [erpItems, setErpItems] = useState([]);
   const [erpLoading, setErpLoading] = useState(false);
@@ -85,7 +90,30 @@ export default function DocumentForm() {
 
   const handleChange = e => {
     const { name, value, files } = e.target;
-    setFormData(prev => ({ ...prev, [name]: files ? files[0] : value }));
+    
+    if (files) {
+      // Handle file input
+      setFormData(prev => ({ ...prev, [name]: files[0] }));
+      
+      // Create preview for images
+      if (name === 'picture1' || name === 'picture2') {
+        const file = files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            if (name === 'picture1') {
+              setPreview1(reader.result);
+            } else {
+              setPreview2(reader.result);
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    } else {
+      // Handle text input
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
     setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
@@ -136,17 +164,39 @@ export default function DocumentForm() {
   const handleSubmit = async () => {
     setLoading(true);
     const payload = new FormData();
+    
+    // Add all text fields
     Object.entries(formData).forEach(([k, v]) => {
-      if (v !== null && v !== '') {
+      if (k !== 'picture1' && k !== 'picture2' && v !== null && v !== '') {
         payload.append(k, v);
       }
     });
+    
+    // Add files if they exist
+    if (formData.picture1) {
+      payload.append('picture1', formData.picture1);
+    }
+    
+    if (formData.picture2) {
+      payload.append('picture2', formData.picture2);
+    }
 
     try {
-      await axios.post('/api/documents/', payload, {
+      // Log the payload for debugging (only key names to avoid large output)
+      console.log('Submitting form with keys:', Array.from(payload.keys()));
+      
+      const response = await axios.post('/api/documents/', payload, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setFeedback({ open: true, message: 'Submitted successfully!', severity: 'success' });
+      
+      console.log('Submit response:', response.data);
+      
+      setFeedback({ 
+        open: true, 
+        message: 'Submitted successfully!', 
+        severity: 'success' 
+      });
+      
       setTimeout(() => navigate('/saleco'), 1500);
     } catch (err) {
       console.error('[DocumentForm] submit error:', err);
@@ -192,7 +242,7 @@ export default function DocumentForm() {
                 onInputChange={(event, newInputValue) => {
                   fetchERPItems(newInputValue);
                 }}
-                isOptionEqualToValue={(option, value) => option.itemId === value.itemId}
+                isOptionEqualToValue={(option, value) => option && value && option.itemId === value.itemId}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -357,26 +407,101 @@ export default function DocumentForm() {
       case 2:
         return (
           <Grid container spacing={2}>
-            {['picture1', 'picture2'].map((name, idx) => (
-              <Grid item xs={12} md={6} key={name}>
+            {/* Upload Picture 1 */}
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Button
                   variant="outlined"
                   component="label"
-                  fullWidth
                   startIcon={<PhotoCamera />}
                   sx={{ height: '56px', borderColor: theme.palette.primary.main }}
                 >
-                  {formData[name]?.name || `Upload Picture ${idx + 1}`}
+                  {formData.picture1?.name || "Upload Picture 1"}
                   <input
                     type="file"
                     hidden
-                    name={name}
+                    name="picture1"
                     accept="image/*"
                     onChange={handleChange}
                   />
                 </Button>
-              </Grid>
-            ))}
+                
+                {preview1 && (
+                  <Box sx={{ 
+                    mt: 2, 
+                    border: '1px solid #ccc', 
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    height: 200,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    bgcolor: 'background.paper'
+                  }}>
+                    <img 
+                      src={preview1} 
+                      alt="Preview 1" 
+                      style={{ 
+                        maxWidth: '100%', 
+                        maxHeight: '100%', 
+                        objectFit: 'contain' 
+                      }} 
+                    />
+                  </Box>
+                )}
+              </Box>
+            </Grid>
+            
+            {/* Upload Picture 2 */}
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<PhotoCamera />}
+                  sx={{ height: '56px', borderColor: theme.palette.primary.main }}
+                >
+                  {formData.picture2?.name || "Upload Picture 2"}
+                  <input
+                    type="file"
+                    hidden
+                    name="picture2"
+                    accept="image/*"
+                    onChange={handleChange}
+                  />
+                </Button>
+                
+                {preview2 && (
+                  <Box sx={{ 
+                    mt: 2, 
+                    border: '1px solid #ccc', 
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    height: 200,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    bgcolor: 'background.paper'
+                  }}>
+                    <img 
+                      src={preview2} 
+                      alt="Preview 2" 
+                      style={{ 
+                        maxWidth: '100%', 
+                        maxHeight: '100%', 
+                        objectFit: 'contain' 
+                      }} 
+                    />
+                  </Box>
+                )}
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Please upload images in JPG, PNG, or GIF format. Maximum file size is 5MB.
+              </Alert>
+            </Grid>
           </Grid>
         );
       case 3:
@@ -413,6 +538,13 @@ export default function DocumentForm() {
                 </Grid>
                 <Grid item xs={12}>
                   <Typography variant="body2"><strong>Prevention Measure:</strong> {formData.preventionMeasure}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2">
+                    <strong>Files Attached:</strong> {formData.picture1 || formData.picture2 ? 'Yes' : 'No'}
+                    {formData.picture1 && ` (${formData.picture1.name})`}
+                    {formData.picture2 && `, (${formData.picture2.name})`}
+                  </Typography>
                 </Grid>
               </Grid>
             </Paper>
@@ -468,8 +600,15 @@ export default function DocumentForm() {
         open={feedback.open}
         autoHideDuration={6000}
         onClose={() => setFeedback(f => ({ ...f, open: false }))}
-        message={feedback.message}
-      />
+      >
+        <Alert 
+          onClose={() => setFeedback(f => ({ ...f, open: false }))} 
+          severity={feedback.severity}
+          sx={{ width: '100%' }}
+        >
+          {feedback.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

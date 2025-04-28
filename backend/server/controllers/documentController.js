@@ -1,4 +1,6 @@
 // server/controllers/documentController.js
+const path = require('path');
+const fs = require('fs');
 const db = require('../config/db');
 
 exports.createNewDocument = async (req, res) => {
@@ -25,19 +27,30 @@ exports.createNewDocument = async (req, res) => {
       ? String(parseInt(last.slice(-4), 10) + 1).padStart(4, '0')
       : '0001';
 
-    const relative1 = req.files?.picture1?.[0]?.filename
-      ? `/uploads/${req.files.picture1[0].filename}`
-      : null;
-    const Img1 = relative1
-      ? `${req.protocol}://${req.get('host')}${relative1}`
-      : null;
+    // Get the absolute path to uploads directory
+    const uploadsDir = path.join(__dirname, '..', 'uploads');
+    
+    // Ensure uploads directory exists
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      console.log('Created uploads directory on demand:', uploadsDir);
+    }
 
-    const relative2 = req.files?.picture2?.[0]?.filename
-      ? `/uploads/${req.files.picture2[0].filename}`
-      : null;
-    const Img2 = relative2
-      ? `${req.protocol}://${req.get('host')}${relative2}`
-      : null;
+    // Construct image URLs with proper paths
+    let Img1 = null;
+    let Img2 = null;
+
+    if (req.files?.picture1?.[0]?.filename) {
+      const relativePath = `/uploads/${req.files.picture1[0].filename}`;
+      Img1 = relativePath;
+      console.log('Img1 path:', Img1);
+    }
+
+    if (req.files?.picture2?.[0]?.filename) {
+      const relativePath = `/uploads/${req.files.picture2[0].filename}`;
+      Img2 = relativePath;
+      console.log('Img2 path:', Img2);
+    }
 
     // 3) Assemble data from text fields & uploaded files
     const doc = {
@@ -71,7 +84,11 @@ exports.createNewDocument = async (req, res) => {
           console.error('[createNewDocument] DB error:', err);
           return res.status(500).json({ message: err.message });
         }
-        res.status(201).json({ message: 'Document created', id: result.insertId });
+        res.status(201).json({ 
+          message: 'Document created', 
+          id: result.insertId,
+          documentId: doc.Document_id
+        });
       }
     );
 
