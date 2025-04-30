@@ -2,6 +2,7 @@
 const path = require('path');
 const fs = require('fs');
 const db = require('../config/db');
+const { notifyDocumentCreated, notifyStatusChange } = require('../utils/telegramNotifier');
 
 exports.createNewDocument = async (req, res) => {
   console.log('💾 createNewDocument req.body:', req.body);
@@ -79,11 +80,20 @@ exports.createNewDocument = async (req, res) => {
     db.pool.query(
       `INSERT INTO documents_nc SET ?`,
       doc,
-      (err, result) => {
+      async (err, result) => {
         if (err) {
           console.error('[createNewDocument] DB error:', err);
           return res.status(500).json({ message: err.message });
         }
+        
+        // Send Telegram notification after successful document creation
+        try {
+          await notifyDocumentCreated(doc);
+        } catch (notifyError) {
+          console.error('Failed to send Telegram notification:', notifyError);
+          // Continue with response, don't fail the request due to notification error
+        }
+        
         res.status(201).json({ 
           message: 'Document created', 
           id: result.insertId,
@@ -163,73 +173,146 @@ exports.deleteDocument = (req, res) => {
   );
 };
 
-exports.acceptInventory = (req, res) => {
+exports.acceptInventory = async (req, res) => {
   const id   = +req.params.id;
   const name = req.user.name;
-  db.pool.query(
-    `
-    UPDATE documents_nc
-    SET
-      status = CASE
-        WHEN status = 'Accepted by QA' THEN 'Accepted by Both'
-        ELSE 'Accepted by Inventory'
-      END,
-      InventoryName      = ?,
-      InventoryTimeStamp = NOW()
-    WHERE id = ?
-    `,
-    [name, id],
-    (err) => {
-      if (err) {
-        console.error('[acceptInventory] DB error:', err);
-        return res.status(500).json({ message: err.message });
-      }
-      res.json({ message: 'Accepted by Inventory' });
+  
+  // First get the document to send in notification
+  try {
+    const [doc] = await db.pool.promise().query(
+      `SELECT * FROM documents_nc WHERE id = ?`,
+      [id]
+    );
+    
+    if (!doc.length) {
+      return res.status(404).json({ message: 'Document not found' });
     }
-  );
+    
+    db.pool.query(
+      `
+      UPDATE documents_nc
+      SET
+        status = CASE
+          WHEN status = 'Accepted by QA' THEN 'Accepted by Both'
+          ELSE 'Accepted by Inventory'
+        END,
+        InventoryName      = ?,
+        InventoryTimeStamp = NOW()
+      WHERE id = ?
+      `,
+      [name, id],
+      async (err) => {
+        if (err) {
+          console.error('[acceptInventory] DB error:', err);
+          return res.status(500).json({ message: err.message });
+        }
+        
+        // Send notification
+        try {
+          await notifyStatusChange(doc[0], 'Accepted by Inventory', name);
+        } catch (notifyError) {
+          console.error('Failed to send Telegram notification:', notifyError);
+        }
+        
+        res.json({ message: 'Accepted by Inventory' });
+      }
+    );
+  } catch (ex) {
+    console.error('[acceptInventory] Unexpected:', ex);
+    res.status(500).json({ message: ex.message });
+  }
 };
 
-exports.acceptQA = (req, res) => {
+exports.acceptQA = async (req, res) => {
   const id   = +req.params.id;
   const name = req.user.name;
-  db.pool.query(
-    `
-    UPDATE documents_nc
-    SET
-      status = CASE
-        WHEN status = 'Accepted by Inventory' THEN 'Accepted by Both'
-        ELSE 'Accepted by QA'
-      END,
-      QAName      = ?,
-      QATimeStamp = NOW()
-    WHERE id = ?
-    `,
-    [name, id],
-    (err) => {
-      if (err) {
-        console.error('[acceptQA] DB error:', err);
-        return res.status(500).json({ message: err.message });
-      }
-      res.json({ message: 'Accepted by QA' });
+  
+  // First get the document to send in notification
+  try {
+    const [doc] = await db.pool.promise().query(
+      `SELECT * FROM documents_nc WHERE id = ?`,
+      [id]
+    );
+    
+    if (!doc.length) {
+      return res.status(404).json({ message: 'Document not found' });
     }
-  );
+    
+    db.pool.query(
+      `
+      UPDATE documents_nc
+      SET
+        status = CASE
+          WHEN status = 'Accepted by Inventory' THEN 'Accepted by Both'
+          ELSE 'Accepted by QA'
+        END,
+        QAName      = ?,
+        QATimeStamp = NOW()
+      WHERE id = ?
+      `,
+      [name, id],
+      async (err) => {
+        if (err) {
+          console.error('[acceptQA] DB error:', err);
+          return res.status(500).json({ message: err.message });
+        }
+        
+        // Send notification
+        try {
+          await notifyStatusChange(doc[0], 'Accepted by QA', name);
+        } catch (notifyError) {
+          console.error('Failed to send Telegram notification:', notifyError);
+        }
+        
+        res.json({ message: 'Accepted by QA' });
+      }
+    );
+  } catch (ex) {
+    console.error('[acceptQA] Unexpected:', ex);
+    res.status(500).json({ message: ex.message });
+  }
 };
 
-exports.updateQADetails = (req, res) => {
+exports.updateQADetails = async (req, res) => {
   const id = +req.params.id;
-  db.pool.query(
-    `UPDATE documents_nc SET ? WHERE id = ?`,
-    [req.body, id],
-    (err) => {
-      if (err) {
-        console.error('[updateQADetails] DB error:', err);
-        return res.status(500).json({ message: err.message });
-      }
-      res.json({ message: 'QA details saved' });
+  
+  // First get the document to send in notification
+  try {
+    const [doc] = await db.pool.promise().query(
+      `SELECT * FROM documents_nc WHERE id = ?`,
+      [id]
+    );
+    
+    if (!doc.length) {
+      return res.status(404).json({ message: 'Document not found' });
     }
-  );
+    
+    db.pool.query(
+      `UPDATE documents_nc SET ? WHERE id = ?`,
+      [req.body, id],
+      async (err) => {
+        if (err) {
+          console.error('[updateQADetails] DB error:', err);
+          return res.status(500).json({ message: err.message });
+        }
+        
+        // Send notification if status is changing to send to manufacture or environment
+        if (req.body.status === 'Send to Manufacture' || req.body.status === 'Send to Environment') {
+          try {
+            await notifyStatusChange(doc[0], req.body.status, req.user.name || 'QA');
+          } catch (notifyError) {
+            console.error('Failed to send Telegram notification:', notifyError);
+          }
+        }
+        
+        res.json({ message: 'QA details saved' });
+      }
+    );
+  } catch (ex) {
+    console.error('[updateQADetails] Unexpected:', ex);
+    res.status(500).json({ message: ex.message });
+  }
 };
-
 
 // server/controllers/documentController.js
 exports.getByDocumentId = (req, res) => {
@@ -253,48 +336,96 @@ exports.getByDocumentId = (req, res) => {
   );
 };
 
-exports.acceptManufacturing = (req, res) => {
+exports.acceptManufacturing = async (req, res) => {
   const id   = +req.params.id;
   const name = req.user.name;
-  db.pool.query(
-    `
-    UPDATE documents_nc
-    SET
-      status = 'Accepted by Manufacture',
-      ManufacturingName = ?,
-      ManufacturingTimeStamp = NOW()
-    WHERE id = ?
-    `,
-    [name, id],
-    (err) => {
-      if (err) {
-        console.error('[acceptManufacturing] DB error:', err);
-        return res.status(500).json({ message: err.message });
-      }
-      res.json({ message: 'Accepted by Manufacturing' });
+  
+  // First get the document to send in notification
+  try {
+    const [doc] = await db.pool.promise().query(
+      `SELECT * FROM documents_nc WHERE id = ?`,
+      [id]
+    );
+    
+    if (!doc.length) {
+      return res.status(404).json({ message: 'Document not found' });
     }
-  );
+    
+    db.pool.query(
+      `
+      UPDATE documents_nc
+      SET
+        status = 'Accepted by Manufacture',
+        ManufacturingName = ?,
+        ManufacturingTimeStamp = NOW()
+      WHERE id = ?
+      `,
+      [name, id],
+      async (err) => {
+        if (err) {
+          console.error('[acceptManufacturing] DB error:', err);
+          return res.status(500).json({ message: err.message });
+        }
+        
+        // Send notification
+        try {
+          await notifyStatusChange(doc[0], 'Accepted by Manufacturing', name);
+        } catch (notifyError) {
+          console.error('Failed to send Telegram notification:', notifyError);
+        }
+        
+        res.json({ message: 'Accepted by Manufacturing' });
+      }
+    );
+  } catch (ex) {
+    console.error('[acceptManufacturing] Unexpected:', ex);
+    res.status(500).json({ message: ex.message });
+  }
 };
 
-exports.acceptEnvironment = (req, res) => {
+exports.acceptEnvironment = async (req, res) => {
   const id   = +req.params.id;
   const name = req.user.name;
-  db.pool.query(
-    `
-    UPDATE documents_nc
-    SET
-      status = 'Accepted by Environment',
-      EnvironmentName = ?,
-      EnvironmentTimeStamp = NOW()
-    WHERE id = ?
-    `,
-    [name, id],
-    (err) => {
-      if (err) {
-        console.error('[acceptEnvironment] DB error:', err);
-        return res.status(500).json({ message: err.message });
-      }
-      res.json({ message: 'Accepted by Environment' });
+  
+  // First get the document to send in notification
+  try {
+    const [doc] = await db.pool.promise().query(
+      `SELECT * FROM documents_nc WHERE id = ?`,
+      [id]
+    );
+    
+    if (!doc.length) {
+      return res.status(404).json({ message: 'Document not found' });
     }
-  );
+    
+    db.pool.query(
+      `
+      UPDATE documents_nc
+      SET
+        status = 'Accepted by Environment',
+        EnvironmentName = ?,
+        EnvironmentTimeStamp = NOW()
+      WHERE id = ?
+      `,
+      [name, id],
+      async (err) => {
+        if (err) {
+          console.error('[acceptEnvironment] DB error:', err);
+          return res.status(500).json({ message: err.message });
+        }
+        
+        // Send notification
+        try {
+          await notifyStatusChange(doc[0], 'Accepted by Environment', name);
+        } catch (notifyError) {
+          console.error('Failed to send Telegram notification:', notifyError);
+        }
+        
+        res.json({ message: 'Accepted by Environment' });
+      }
+    );
+  } catch (ex) {
+    console.error('[acceptEnvironment] Unexpected:', ex);
+    res.status(500).json({ message: ex.message });
+  }
 };
