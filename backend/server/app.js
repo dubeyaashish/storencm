@@ -36,7 +36,7 @@ app.use(bodyParser.json());
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(uploadsDir));
-
+app.use('/pdf', express.static(path.join(__dirname, 'pdf')));
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);

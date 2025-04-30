@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../config/db');
 const { notifyDocumentCreated, notifyStatusChange } = require('../utils/telegramNotifier');
+const { generateFormPDF, getPdfUrl } = require('../utils/pdfService');
 
 exports.createNewDocument = async (req, res) => {
   console.log('💾 createNewDocument req.body:', req.body);
@@ -86,18 +87,80 @@ exports.createNewDocument = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Send Telegram notification after successful document creation
+        // Generate PDF form from document data
+        let pdfUrl = null;
         try {
-          await notifyDocumentCreated(doc);
-        } catch (notifyError) {
-          console.error('Failed to send Telegram notification:', notifyError);
-          // Continue with response, don't fail the request due to notification error
+          // Get full document data
+          const [fullDoc] = await db.pool.promise().query(
+            `SELECT d.*, u.name AS creatorName
+             FROM documents_nc d 
+             JOIN NC_Login u ON d.createdBy = u.id
+             WHERE d.id = ?`,
+            [result.insertId]
+          );
+          
+          if (fullDoc && fullDoc.length > 0) {
+            // Generate the PDF form
+            const pdfPath = await generateFormPDF(fullDoc[0]);
+            
+            // Get full URL to the PDF
+            pdfUrl = getPdfUrl(fullDoc[0].Document_id);
+            
+            // Add PDF URL to the document
+            await db.pool.promise().query(
+              `UPDATE documents_nc SET PdfUrl = ? WHERE id = ?`,
+              [pdfUrl, result.insertId]
+            );
+            
+            // Send Telegram notification with PDF link
+            await notifyDocumentCreated({
+              ...fullDoc[0],
+              pdfUrl: pdfUrl
+            });
+          } else {
+            // Fall back to basic document data if full data not available
+            const generatedPdfPath = await generateFormPDF(doc);
+            pdfUrl = getPdfUrl(doc.Document_id);
+            
+            await db.pool.promise().query(
+              `UPDATE documents_nc SET PdfUrl = ? WHERE id = ?`,
+              [pdfUrl, result.insertId]
+            );
+            
+            await notifyDocumentCreated({
+              ...doc,
+              pdfUrl: pdfUrl
+            });
+          }
+        } catch (pdfError) {
+          console.error('Failed to generate PDF form:', pdfError);
+          // Continue with response, don't fail the request due to PDF generation error
+          
+          // Still send Telegram notification without PDF link
+          try {
+            const [fullDoc] = await db.pool.promise().query(
+              `SELECT d.*, u.name AS creatorName
+               FROM documents_nc d 
+               JOIN NC_Login u ON d.createdBy = u.id
+               WHERE d.id = ?`,
+              [result.insertId]
+            );
+            
+            if (fullDoc && fullDoc.length > 0) {
+              await notifyDocumentCreated(fullDoc[0]);
+            } else {
+              await notifyDocumentCreated(doc);
+            }
+          } catch (notifyError) {
+            console.error('Failed to send Telegram notification:', notifyError);
+          }
         }
         
         res.status(201).json({ 
           message: 'Document created', 
           id: result.insertId,
-          documentId: doc.Document_id
+          documentId: doc.Document_id,
+          pdfUrl: pdfUrl
         });
       }
     );
@@ -207,9 +270,17 @@ exports.acceptInventory = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
+        // Get updated document with PDF URL
+        const [[updatedDoc]] = await db.pool.promise().query(
+          `SELECT * FROM documents_nc WHERE id = ?`,
+          [id]
+        );
+        
         // Send notification
         try {
-          await notifyStatusChange(doc[0], 'Accepted by Inventory', name);
+          await notifyStatusChange(updatedDoc, 
+            updatedDoc.status === 'Accepted by Both' ? 'Accepted by Both' : 'Accepted by Inventory', 
+            name);
         } catch (notifyError) {
           console.error('Failed to send Telegram notification:', notifyError);
         }
@@ -257,9 +328,17 @@ exports.acceptQA = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
+        // Get updated document with PDF URL
+        const [[updatedDoc]] = await db.pool.promise().query(
+          `SELECT * FROM documents_nc WHERE id = ?`,
+          [id]
+        );
+        
         // Send notification
         try {
-          await notifyStatusChange(doc[0], 'Accepted by QA', name);
+          await notifyStatusChange(updatedDoc, 
+            updatedDoc.status === 'Accepted by Both' ? 'Accepted by Both' : 'Accepted by QA', 
+            name);
         } catch (notifyError) {
           console.error('Failed to send Telegram notification:', notifyError);
         }
@@ -296,10 +375,16 @@ exports.updateQADetails = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
+        // Get updated document with PDF URL
+        const [[updatedDoc]] = await db.pool.promise().query(
+          `SELECT * FROM documents_nc WHERE id = ?`,
+          [id]
+        );
+        
         // Send notification if status is changing to send to manufacture or environment
         if (req.body.status === 'Send to Manufacture' || req.body.status === 'Send to Environment') {
           try {
-            await notifyStatusChange(doc[0], req.body.status, req.user.name || 'QA');
+            await notifyStatusChange(updatedDoc, req.body.status, req.user.name || 'QA');
           } catch (notifyError) {
             console.error('Failed to send Telegram notification:', notifyError);
           }
@@ -367,9 +452,15 @@ exports.acceptManufacturing = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
+        // Get updated document with PDF URL
+        const [[updatedDoc]] = await db.pool.promise().query(
+          `SELECT * FROM documents_nc WHERE id = ?`,
+          [id]
+        );
+        
         // Send notification
         try {
-          await notifyStatusChange(doc[0], 'Accepted by Manufacturing', name);
+          await notifyStatusChange(updatedDoc, 'Accepted by Manufacturing', name);
         } catch (notifyError) {
           console.error('Failed to send Telegram notification:', notifyError);
         }
@@ -414,9 +505,15 @@ exports.acceptEnvironment = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
+        // Get updated document with PDF URL
+        const [[updatedDoc]] = await db.pool.promise().query(
+          `SELECT * FROM documents_nc WHERE id = ?`,
+          [id]
+        );
+        
         // Send notification
         try {
-          await notifyStatusChange(doc[0], 'Accepted by Environment', name);
+          await notifyStatusChange(updatedDoc, 'Accepted by Environment', name);
         } catch (notifyError) {
           console.error('Failed to send Telegram notification:', notifyError);
         }
@@ -427,5 +524,54 @@ exports.acceptEnvironment = async (req, res) => {
   } catch (ex) {
     console.error('[acceptEnvironment] Unexpected:', ex);
     res.status(500).json({ message: ex.message });
+  }
+};
+
+// Add this method to retrieve and download a PDF
+exports.getPdf = (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(__dirname, '..', 'pdf', filename);
+  
+  // Check if file exists
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ message: 'PDF not found' });
+  }
+  
+  // Send the file
+  res.sendFile(filePath);
+};
+
+// Method to regenerate a PDF
+exports.regeneratePdf = async (req, res) => {
+  try {
+    const id = +req.params.id;
+    
+    // Get document data
+    const [doc] = await db.pool.promise().query(
+      `SELECT * FROM documents_nc WHERE id = ?`,
+      [id]
+    );
+    
+    if (!doc.length) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+    
+    // Generate PDF
+    const pdfPath = await generateFormPDF(doc[0]);
+    const pdfUrl = getPdfUrl(doc[0].Document_id);
+    
+    // Update document with PDF URL
+    await db.pool.promise().query(
+      `UPDATE documents_nc SET PdfUrl = ? WHERE id = ?`,
+      [pdfUrl, id]
+    );
+    
+    res.json({
+      message: 'PDF regenerated successfully',
+      pdfUrl: pdfUrl
+    });
+  } catch (error) {
+    console.error('Error regenerating PDF:', error);
+    res.status(500).json({ message: 'Error regenerating PDF' });
   }
 };

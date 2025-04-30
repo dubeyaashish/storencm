@@ -21,6 +21,19 @@ if (!fs.existsSync(uploadsDir)) {
   }
 }
 
+// Ensure PDF directory exists
+const pdfDir = path.join(__dirname, '../pdf');
+if (!fs.existsSync(pdfDir)) {
+  try {
+    fs.mkdirSync(pdfDir, { recursive: true });
+    // Ensure write permissions
+    fs.chmodSync(pdfDir, 0o755);
+    console.log('Created pdf directory from routes:', pdfDir);
+  } catch (error) {
+    console.error('Error creating pdf directory from routes:', error);
+  }
+}
+
 // Multer setup: store files in /uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -149,6 +162,21 @@ router.post(
   authenticateJWT,
   authorizeRoles(['Environment']),
   dc.acceptEnvironment
+);
+
+// ─── PDF Routes ─────────────────────────────────────────────────────────────────
+// Get PDF by filename
+router.get(
+  '/pdf/:filename',
+  authenticateJWT,
+  dc.getPdf
+);
+
+// Regenerate PDF
+router.post(
+  '/:id/regenerate-pdf',
+  authenticateJWT,
+  dc.regeneratePdf
 );
 
 module.exports = router;

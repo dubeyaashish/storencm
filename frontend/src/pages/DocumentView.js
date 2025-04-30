@@ -45,9 +45,28 @@ export default function DocumentView() {
       .finally(() => setLoading(false));
   }, [documentId]);
 
+  // Improved date formatting function with en-GB locale
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleString();
+    
+    // Parse the date string
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) return "N/A";
+    
+    // Check for dates close to epoch (1899-12-30, 1900-01-01, etc.)
+    const year = date.getFullYear();
+    if (year < 1950) return "N/A";
+    
+    // Format the date using en-GB locale (DD/MM/YYYY format)
+    return new Intl.DateTimeFormat('en-GB', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
   };
 
   const getStatusColor = (status) => {
@@ -127,12 +146,12 @@ export default function DocumentView() {
               Basic Information
             </Typography>
             <Divider sx={{ mb: 2 }} />
-            <Typography><strong>Product ID:</strong> {doc.Product_id}</Typography>
-            <Typography><strong>Serial #:</strong> {doc.Sn_number}</Typography>
-            <Typography><strong>Description:</strong> {doc.Description}</Typography>
-            <Typography><strong>Lot No:</strong> {doc.Lot_No}</Typography>
-            <Typography><strong>Size:</strong> {doc.Product_size}</Typography>
-            <Typography><strong>Quantity:</strong> {doc.Quantity}</Typography>
+            <Typography><strong>Product ID:</strong> {doc.Product_id || 'N/A'}</Typography>
+            <Typography><strong>Serial #:</strong> {doc.Sn_number || 'N/A'}</Typography>
+            <Typography><strong>Description:</strong> {doc.Description || 'N/A'}</Typography>
+            <Typography><strong>Lot No:</strong> {doc.Lot_No || 'N/A'}</Typography>
+            <Typography><strong>Size:</strong> {doc.Product_size || 'N/A'}</Typography>
+            <Typography><strong>Quantity:</strong> {doc.Quantity || 'N/A'}</Typography>
             <Typography><strong>Date Created:</strong> {formatDate(doc.date)}</Typography>
           </Paper>
         </Grid>
@@ -144,11 +163,11 @@ export default function DocumentView() {
               Issue Details
             </Typography>
             <Divider sx={{ mb: 2 }} />
-            <Typography><strong>Issue Found:</strong> {doc.Issue_Found}</Typography>
-            <Typography><strong>Issue Description:</strong> {doc.Issue_Description}</Typography>
-            <Typography><strong>Foundee:</strong> {doc.Foundee}</Typography>
-            <Typography><strong>Department:</strong> {doc.Department}</Typography>
-            <Typography><strong>Prevention Measure:</strong> {doc.Prevention}</Typography>
+            <Typography><strong>Issue Found:</strong> {doc.Issue_Found || 'N/A'}</Typography>
+            <Typography><strong>Issue Description:</strong> {doc.Issue_Description || 'N/A'}</Typography>
+            <Typography><strong>Foundee:</strong> {doc.Foundee || 'N/A'}</Typography>
+            <Typography><strong>Department:</strong> {doc.Department || 'N/A'}</Typography>
+            <Typography><strong>Prevention Measure:</strong> {doc.Prevention || 'N/A'}</Typography>
           </Paper>
         </Grid>
 
@@ -226,7 +245,7 @@ export default function DocumentView() {
               <Divider sx={{ mb: 2 }} />
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
-                  <Typography><strong>QA Accepted By:</strong> {doc.QAName}</Typography>
+                  <Typography><strong>QA Accepted By:</strong> {doc.QAName || 'N/A'}</Typography>
                   <Typography><strong>QA Timestamp:</strong> {formatDate(doc.QATimeStamp)}</Typography>
                   <Typography><strong>QA Solution:</strong> {doc.QASolution || 'N/A'}</Typography>
                   <Typography><strong>Solution Description:</strong> {doc.QASolutionDescription || 'N/A'}</Typography>
@@ -252,7 +271,7 @@ export default function DocumentView() {
                 Inventory Assessment
               </Typography>
               <Divider sx={{ mb: 2 }} />
-              <Typography><strong>Inventory Accepted By:</strong> {doc.InventoryName}</Typography>
+              <Typography><strong>Inventory Accepted By:</strong> {doc.InventoryName || 'N/A'}</Typography>
               <Typography><strong>Inventory Timestamp:</strong> {formatDate(doc.InventoryTimeStamp)}</Typography>
             </Paper>
           </Grid>
@@ -274,7 +293,7 @@ export default function DocumentView() {
               ) : (
                 <>
                   <Typography><strong>Manufacturing Accepted By:</strong> {doc.ManufacturingName || 'N/A'}</Typography>
-                  <Typography><strong>Manufacturing Timestamp:</strong> {formatDate(doc.ManufacturingTimeStamp) || 'N/A'}</Typography>
+                  <Typography><strong>Manufacturing Timestamp:</strong> {formatDate(doc.ManufacturingTimeStamp)}</Typography>
                   <Typography><strong>Manufacturing Comments:</strong> {doc.ManufacturingComments || 'N/A'}</Typography>
                 </>
               )}
@@ -298,7 +317,7 @@ export default function DocumentView() {
               ) : (
                 <>
                   <Typography><strong>Environment Accepted By:</strong> {doc.EnvironmentName || 'N/A'}</Typography>
-                  <Typography><strong>Environment Timestamp:</strong> {formatDate(doc.EnvironmentTimeStamp) || 'N/A'}</Typography>
+                  <Typography><strong>Environment Timestamp:</strong> {formatDate(doc.EnvironmentTimeStamp)}</Typography>
                   <Typography><strong>Environmental Impact:</strong> {doc.EnvironmentalImpact || 'N/A'}</Typography>
                   <Typography><strong>Mitigation Measures:</strong> {doc.MitigationMeasures || 'N/A'}</Typography>
                 </>
