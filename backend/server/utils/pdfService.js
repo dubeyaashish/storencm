@@ -291,7 +291,7 @@ async function generateFormPDF(document) {
  * @returns {String} URL to access the PDF
  */
 function getPdfUrl(documentId) {
-  const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+  const baseUrl = process.env.BASE_URL;
   const filename = `${documentId.replace(/\//g, '-')}.pdf`;
   const pdfUrl = `${baseUrl}/pdf/${filename}`;
   console.log(`Generated PDF URL: ${pdfUrl}`);

@@ -1,4 +1,3 @@
-// server/utils/telegramNotifier.js
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
@@ -11,17 +10,28 @@ const TELEGRAM_CONFIG = {
 };
 
 /**
+ * Validate URL format
+ * @param {string} url - URL to validate
+ * @returns {boolean} True if valid URL
+ */
+function isValidUrl(url) {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Format date for display
  * @param {Date|string} date - Date object or string to format
  * @returns {string} Formatted date string
  */
 function formatDate(date) {
   if (!date) return 'N/A';
-  // Handle both Date objects and date strings
   const dateObj = date instanceof Date ? date : new Date(date);
-  // Check if date is valid
   if (isNaN(dateObj.getTime())) return 'N/A';
-  // Format using en-GB locale (DD/MM/YYYY)
   return new Intl.DateTimeFormat('en-GB', {
     year: 'numeric',
     month: '2-digit',
@@ -38,6 +48,7 @@ function formatDate(date) {
  */
 async function sendTelegramMessage(message) {
   try {
+    console.log('Preparing to send Telegram message:', message);
     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_CONFIG.botToken}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -49,11 +60,15 @@ async function sendTelegramMessage(message) {
     });
 
     const result = await response.json();
-    console.log('Telegram notification sent:', result);
+    if (!result.ok) {
+      console.error('Telegram API error:', result);
+      return null;
+    }
+    console.log('Telegram notification sent successfully:', result);
     return result;
   } catch (error) {
     console.error('Error sending Telegram notification:', error);
-    // Don't throw, just log the error
+    return null;
   }
 }
 
@@ -65,16 +80,12 @@ async function sendTelegramMessage(message) {
 function resolveImagePath(imagePath) {
   if (!imagePath) return null;
   
-  // Handle different path formats
   if (!imagePath.startsWith('/') && !imagePath.includes('://')) {
-    // If it's a relative path without leading slash
-    return path.join(__dirname, '..', 'uploads', imagePath);
-  } else if (imagePath.startsWith('/uploads/')) {
-    // If it's a web path starting with /uploads/
+    return path.join(__dirname, '..', 'Uploads', imagePath);
+  } else if (imagePath.startsWith('/Uploads/') || imagePath.startsWith('/uploads/')) {
     return path.join(__dirname, '..', imagePath.substring(1));
   }
   
-  // Already an absolute path or other format
   return imagePath;
 }
 
@@ -86,24 +97,20 @@ function resolveImagePath(imagePath) {
  */
 async function sendTelegramPhotoWithCaption(imagePath, caption) {
   try {
-    // Resolve absolute path to image
     const absoluteImagePath = resolveImagePath(imagePath);
     
-    // Check if file exists
     if (!absoluteImagePath || !fs.existsSync(absoluteImagePath)) {
       console.error(`Image file not found: ${absoluteImagePath}`);
       return null;
     }
     
-    console.log(`Sending image from path: ${absoluteImagePath}`);
+    console.log(`Sending image from path: ${absoluteImagePath} with caption:`, caption);
     
-    // Create form data for multipart request
     const form = new FormData();
     form.append('chat_id', TELEGRAM_CONFIG.chatId);
     form.append('photo', fs.createReadStream(absoluteImagePath));
     
     if (caption) {
-      // Limit caption to 1024 characters (Telegram API limit)
       form.append('caption', caption.substring(0, 1024));
       form.append('parse_mode', 'HTML');
     }
@@ -117,11 +124,15 @@ async function sendTelegramPhotoWithCaption(imagePath, caption) {
     );
     
     const result = await response.json();
-    console.log('Telegram photo sent:', result);
+    if (!result.ok) {
+      console.error('Telegram API error for photo:', result);
+      return null;
+    }
+    console.log('Telegram photo sent successfully:', result);
     return result;
   } catch (error) {
     console.error('Error sending Telegram photo:', error);
-    // Don't throw, just log the error
+    return null;
   }
 }
 
@@ -130,15 +141,14 @@ async function sendTelegramPhotoWithCaption(imagePath, caption) {
  * @param {Object} document - The document object
  */
 async function notifyDocumentCreated(document) {
-  // Create the notification message with PDF link if available
-  const pdfLink = document.pdfUrl 
-    ? `\n\n<b>📄 เอกสาร PDF:</b> <a href="${document.pdfUrl}">ดาวน์โหลด PDF</a>` 
-    : '';
-    
+  console.log('notifyDocumentCreated called with document:', document);
+  console.log('PdfUrl present?', !!document.PdfUrl, 'Value:', document.PdfUrl);
+  
+  // Construct message without PDF link for caption
   const message = `
 <b> New NC Document Created</b>
 
-<b>📝หมายเลขเอกสาร:</b> ${document.Document_id}
+<b>📝หมายเลขเอกสาร:</b> ${document.Document_id || 'N/A'}
 <b>รหัสสินค้า:</b> ${document.Product_id || 'N/A'}
 <b>รายละเอียดสินค้า:</b> ${document.Description || 'N/A'}
 <b>Lot No:</b> ${document.Lot_No || 'N/A'}
@@ -147,22 +157,41 @@ async function notifyDocumentCreated(document) {
 <b>อธิบายปํญหา:</b> ${document.Issue_Description || 'N/A'}
 <b>สร้างโดย:</b> ${document.Foundee || 'N/A'}
 <b>แผนก:</b> ${document.Department || 'N/A'}
-<b>วันที่:</b> ${formatDate(document.date)}${pdfLink}
-`;
+<b>วันที่:</b> ${formatDate(document.date)}
+`.trim();
 
-  // If there's an image, send the photo with the caption
+  console.log('Message for caption:', message);
+
+  // Construct PDF link as plain text for separate message
+  const pdfLinkMessage = document.PdfUrl && typeof document.PdfUrl === 'string' && document.PdfUrl.trim() !== '' && isValidUrl(document.PdfUrl)
+    ? `📄 เอกสาร PDF: ${document.PdfUrl}`
+    : '';
+  console.log('PDF link message:', pdfLinkMessage);
+
   if (document.Img1) {
     try {
-      // Send the first image with the full message as caption
-      await sendTelegramPhotoWithCaption(document.Img1, message);
+      // Send image with caption
+      const result = await sendTelegramPhotoWithCaption(document.Img1, message);
+      if (!result) {
+        console.log('Image send failed, falling back to text message');
+        await sendTelegramMessage(message);
+      }
+      // Send PDF link as separate message
+      if (pdfLinkMessage) {
+        await sendTelegramMessage(pdfLinkMessage);
+      }
     } catch (imgError) {
       console.error('Error sending image with notification:', imgError);
-      // If image sending fails, fall back to text-only notification
       await sendTelegramMessage(message);
+      if (pdfLinkMessage) {
+        await sendTelegramMessage(pdfLinkMessage);
+      }
     }
   } else {
-    // No image, just send text
     await sendTelegramMessage(message);
+    if (pdfLinkMessage) {
+      await sendTelegramMessage(pdfLinkMessage);
+    }
   }
 }
 
@@ -173,14 +202,24 @@ async function notifyDocumentCreated(document) {
  * @param {string} actor - Name of the person who performed the action
  */
 async function notifyStatusChange(document, action, actor) {
-  // Add PDF link if available
-  const pdfLink = document.PdfUrl || document.pdfUrl 
-    ? `\n\n<b>📄 เอกสาร PDF:</b> <a href="${document.PdfUrl || document.pdfUrl}">ดาวน์โหลด PDF</a>` 
-    : '';
+  console.log('notifyStatusChange called with document:', document);
+  console.log('PdfUrl present?', !!document.PdfUrl, 'Value:', document.PdfUrl);
+  
+  const message = `
+<b>📝 เอกสารมีการเปลี่ยนสถานะ: ${action}</b>
+
+<b>หมายเลขเอกสาร:</b> ${document.Document_id || 'N/A'}
+<b>รหัสสินค้า:</b> ${document.Product_id || 'N/A'}
+<b>รายละเอียดสินค้า:</b> ${document.Description || 'N/A'}
+<b>Lot No:</b> ${document.Lot_No || 'N/A'}
+<b>จำนวน:</b> ${document.Quantity || 'N/A'}
+<b>ปัญหาที่พบ:</b> ${document.Issue_Found || 'N/A'}
+<b>สถานะเปลี่ยนโดย:</b> ${actor || 'N/A'}
+<b>วันที่:</b> ${formatDate(new Date())}
+`.trim();
 
   let additionalInfo = '';
   
-  // Add specific details based on the action type
   if (action === 'Accepted by QA') {
     additionalInfo = `
 <b>📝หมายเลขเอกสาร:</b> ${document.Document_id}
@@ -230,24 +269,23 @@ async function notifyStatusChange(document, action, actor) {
 <b>Both QA and Inventory have now accepted this document.</b>`;
   }
 
-  const message = `
-<b>📝 เอกสารมีการเปลี่ยนสถานะ: ${action}</b>
-
-<b>หมายเลขเอกสาร:</b> ${document.Document_id}
-<b>รหัสสินค้า:</b> ${document.Product_id || 'N/A'}
-<b>รายละเอียดสินค้า:</b> ${document.Description || 'N/A'}
-<b>Lot No:</b> ${document.Lot_No || 'N/A'}
-<b>จำนวน:</b> ${document.Quantity || 'N/A'}
-<b>ปัญหาที่พบ:</b> ${document.Issue_Found || 'N/A'}
-<b>สถานะเปลี่ยนโดย:</b> ${actor}
-<b>วันที่:</b> ${formatDate(new Date())}
+  const fullMessage = `
+${message}
 ${additionalInfo}
-${pdfLink}
+`.trim();
 
-<i>This status change requires attention from the appropriate department.</i>
-`;
+  console.log('Message for status change:', fullMessage);
 
-  return await sendTelegramMessage(message);
+  // Construct PDF link as plain text for separate message
+  const pdfLinkMessage = document.PdfUrl && typeof document.PdfUrl === 'string' && document.PdfUrl.trim() !== '' && isValidUrl(document.PdfUrl)
+    ? `📄 เอกสาร PDF: ${document.PdfUrl}`
+    : '';
+  console.log('PDF link message:', pdfLinkMessage);
+
+  await sendTelegramMessage(fullMessage);
+  if (pdfLinkMessage) {
+    await sendTelegramMessage(pdfLinkMessage);
+  }
 }
 
 module.exports = {

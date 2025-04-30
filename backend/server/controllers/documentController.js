@@ -1,4 +1,3 @@
-// server/controllers/documentController.js
 const path = require('path');
 const fs = require('fs');
 const db = require('../config/db');
@@ -12,8 +11,8 @@ exports.createNewDocument = async (req, res) => {
   try {
     // 1) Build Document_id prefix WNCMMYY
     const now = new Date();
-    const mm  = String(now.getMonth() + 1).padStart(2, '0');
-    const yy  = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yy = String(now.getFullYear()).slice(-2);
     const prefix = `WNC${yy}${mm}`;
 
     // 2) Find last sequence this month
@@ -30,7 +29,7 @@ exports.createNewDocument = async (req, res) => {
       : '0001';
 
     // Get the absolute path to uploads directory
-    const uploadsDir = path.join(__dirname, '..', 'uploads');
+    const uploadsDir = path.join(__dirname, '..', 'Uploads');
     
     // Ensure uploads directory exists
     if (!fs.existsSync(uploadsDir)) {
@@ -43,13 +42,13 @@ exports.createNewDocument = async (req, res) => {
     let Img2 = null;
 
     if (req.files?.picture1?.[0]?.filename) {
-      const relativePath = `/uploads/${req.files.picture1[0].filename}`;
+      const relativePath = `/Uploads/${req.files.picture1[0].filename}`;
       Img1 = relativePath;
       console.log('Img1 path:', Img1);
     }
 
     if (req.files?.picture2?.[0]?.filename) {
-      const relativePath = `/uploads/${req.files.picture2[0].filename}`;
+      const relativePath = `/Uploads/${req.files.picture2[0].filename}`;
       Img2 = relativePath;
       console.log('Img2 path:', Img2);
     }
@@ -57,22 +56,20 @@ exports.createNewDocument = async (req, res) => {
     // 3) Assemble data from text fields & uploaded files
     const doc = {
       Document_id: prefix + seq,
-      status:      'Created',
-      createdBy:   req.user.userId,
-
-      // Don't parse Product_id as integer if it's meant to be a string
-      Product_id:        req.body.productId, // Keep as string if that's what your DB expects
-      Sn_number:         req.body.snNumber,
-      Description:       req.body.description,
-      date:              new Date(),
-      Lot_No:            req.body.lotNo,
-      Product_size:      req.body.size,
-      Quantity:          parseInt(req.body.quantity, 10),
-      Issue_Found:       req.body.issueFound,
-      Foundee:           req.body.foundeeName,
-      Department:        req.body.department,
+      status: 'Created',
+      createdBy: req.user.userId,
+      Product_id: req.body.productId,
+      Sn_number: req.body.snNumber,
+      Description: req.body.description,
+      date: new Date(),
+      Lot_No: req.body.lotNo,
+      Product_size: req.body.size,
+      Quantity: parseInt(req.body.quantity, 10),
+      Issue_Found: req.body.issueFound,
+      Foundee: req.body.foundeeName,
+      Department: req.body.department,
       Issue_Description: req.body.whatHappened,
-      Prevention:        req.body.preventionMeasure,
+      Prevention: req.body.preventionMeasure,
       Img1,
       Img2
     };
@@ -88,7 +85,7 @@ exports.createNewDocument = async (req, res) => {
         }
         
         // Generate PDF form from document data
-        let pdfUrl = null;
+        let PdfUrl = null;
         try {
           // Get full document data
           const [fullDoc] = await db.pool.promise().query(
@@ -104,39 +101,43 @@ exports.createNewDocument = async (req, res) => {
             const pdfPath = await generateFormPDF(fullDoc[0]);
             
             // Get full URL to the PDF
-            pdfUrl = getPdfUrl(fullDoc[0].Document_id);
+            PdfUrl = getPdfUrl(fullDoc[0].Document_id);
             
             // Add PDF URL to the document
             await db.pool.promise().query(
               `UPDATE documents_nc SET PdfUrl = ? WHERE id = ?`,
-              [pdfUrl, result.insertId]
+              [PdfUrl, result.insertId]
             );
+            
+            // Log document object before notification
+            console.log('Document before notifyDocumentCreated:', { ...fullDoc[0], PdfUrl });
             
             // Send Telegram notification with PDF link
             await notifyDocumentCreated({
               ...fullDoc[0],
-              pdfUrl: pdfUrl
+              PdfUrl
             });
           } else {
-            // Fall back to basic document data if full data not available
+            // Fall back to basic document data
             const generatedPdfPath = await generateFormPDF(doc);
-            pdfUrl = getPdfUrl(doc.Document_id);
+            PdfUrl = getPdfUrl(doc.Document_id);
             
             await db.pool.promise().query(
               `UPDATE documents_nc SET PdfUrl = ? WHERE id = ?`,
-              [pdfUrl, result.insertId]
+              [PdfUrl, result.insertId]
             );
+            
+            console.log('Fallback document before notifyDocumentCreated:', { ...doc, PdfUrl });
             
             await notifyDocumentCreated({
               ...doc,
-              pdfUrl: pdfUrl
+              PdfUrl
             });
           }
         } catch (pdfError) {
           console.error('Failed to generate PDF form:', pdfError);
-          // Continue with response, don't fail the request due to PDF generation error
           
-          // Still send Telegram notification without PDF link
+          // Send Telegram notification without PDF link
           try {
             const [fullDoc] = await db.pool.promise().query(
               `SELECT d.*, u.name AS creatorName
@@ -147,8 +148,10 @@ exports.createNewDocument = async (req, res) => {
             );
             
             if (fullDoc && fullDoc.length > 0) {
+              console.log('Document before notifyDocumentCreated (no PDF):', fullDoc[0]);
               await notifyDocumentCreated(fullDoc[0]);
             } else {
+              console.log('Fallback document before notifyDocumentCreated (no PDF):', doc);
               await notifyDocumentCreated(doc);
             }
           } catch (notifyError) {
@@ -160,7 +163,7 @@ exports.createNewDocument = async (req, res) => {
           message: 'Document created', 
           id: result.insertId,
           documentId: doc.Document_id,
-          pdfUrl: pdfUrl
+          PdfUrl
         });
       }
     );
@@ -237,10 +240,9 @@ exports.deleteDocument = (req, res) => {
 };
 
 exports.acceptInventory = async (req, res) => {
-  const id   = +req.params.id;
+  const id = +req.params.id;
   const name = req.user.name;
   
-  // First get the document to send in notification
   try {
     const [doc] = await db.pool.promise().query(
       `SELECT * FROM documents_nc WHERE id = ?`,
@@ -259,7 +261,7 @@ exports.acceptInventory = async (req, res) => {
           WHEN status = 'Accepted by QA' THEN 'Accepted by Both'
           ELSE 'Accepted by Inventory'
         END,
-        InventoryName      = ?,
+        InventoryName = ?,
         InventoryTimeStamp = NOW()
       WHERE id = ?
       `,
@@ -270,17 +272,20 @@ exports.acceptInventory = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Get updated document with PDF URL
         const [[updatedDoc]] = await db.pool.promise().query(
           `SELECT * FROM documents_nc WHERE id = ?`,
           [id]
         );
         
-        // Send notification
+        updatedDoc.PdfUrl = updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+        console.log('Document before notifyStatusChange (acceptInventory):', updatedDoc);
+        
         try {
-          await notifyStatusChange(updatedDoc, 
-            updatedDoc.status === 'Accepted by Both' ? 'Accepted by Both' : 'Accepted by Inventory', 
-            name);
+          await notifyStatusChange(
+            updatedDoc,
+            updatedDoc.status === 'Accepted by Both' ? 'Accepted by Both' : 'Accepted by Inventory',
+            name
+          );
         } catch (notifyError) {
           console.error('Failed to send Telegram notification:', notifyError);
         }
@@ -295,10 +300,9 @@ exports.acceptInventory = async (req, res) => {
 };
 
 exports.acceptQA = async (req, res) => {
-  const id   = +req.params.id;
+  const id = +req.params.id;
   const name = req.user.name;
   
-  // First get the document to send in notification
   try {
     const [doc] = await db.pool.promise().query(
       `SELECT * FROM documents_nc WHERE id = ?`,
@@ -317,7 +321,7 @@ exports.acceptQA = async (req, res) => {
           WHEN status = 'Accepted by Inventory' THEN 'Accepted by Both'
           ELSE 'Accepted by QA'
         END,
-        QAName      = ?,
+        QAName = ?,
         QATimeStamp = NOW()
       WHERE id = ?
       `,
@@ -328,17 +332,20 @@ exports.acceptQA = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Get updated document with PDF URL
         const [[updatedDoc]] = await db.pool.promise().query(
           `SELECT * FROM documents_nc WHERE id = ?`,
           [id]
         );
         
-        // Send notification
+        updatedDoc.PdfUrl = updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+        console.log('Document before notifyStatusChange (acceptQA):', updatedDoc);
+        
         try {
-          await notifyStatusChange(updatedDoc, 
-            updatedDoc.status === 'Accepted by Both' ? 'Accepted by Both' : 'Accepted by QA', 
-            name);
+          await notifyStatusChange(
+            updatedDoc,
+            updatedDoc.status === 'Accepted by Both' ? 'Accepted by Both' : 'Accepted by QA',
+            name
+          );
         } catch (notifyError) {
           console.error('Failed to send Telegram notification:', notifyError);
         }
@@ -355,7 +362,6 @@ exports.acceptQA = async (req, res) => {
 exports.updateQADetails = async (req, res) => {
   const id = +req.params.id;
   
-  // First get the document to send in notification
   try {
     const [doc] = await db.pool.promise().query(
       `SELECT * FROM documents_nc WHERE id = ?`,
@@ -375,13 +381,14 @@ exports.updateQADetails = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Get updated document with PDF URL
         const [[updatedDoc]] = await db.pool.promise().query(
           `SELECT * FROM documents_nc WHERE id = ?`,
           [id]
         );
         
-        // Send notification if status is changing to send to manufacture or environment
+        updatedDoc.PdfUrl = updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+        console.log('Document before notifyStatusChange (updateQADetails):', updatedDoc);
+        
         if (req.body.status === 'Send to Manufacture' || req.body.status === 'Send to Environment') {
           try {
             await notifyStatusChange(updatedDoc, req.body.status, req.user.name || 'QA');
@@ -399,7 +406,6 @@ exports.updateQADetails = async (req, res) => {
   }
 };
 
-// server/controllers/documentController.js
 exports.getByDocumentId = (req, res) => {
   const docId = req.params.documentId;
   db.pool.query(
@@ -422,10 +428,9 @@ exports.getByDocumentId = (req, res) => {
 };
 
 exports.acceptManufacturing = async (req, res) => {
-  const id   = +req.params.id;
+  const id = +req.params.id;
   const name = req.user.name;
   
-  // First get the document to send in notification
   try {
     const [doc] = await db.pool.promise().query(
       `SELECT * FROM documents_nc WHERE id = ?`,
@@ -452,13 +457,14 @@ exports.acceptManufacturing = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Get updated document with PDF URL
         const [[updatedDoc]] = await db.pool.promise().query(
           `SELECT * FROM documents_nc WHERE id = ?`,
           [id]
         );
         
-        // Send notification
+        updatedDoc.PdfUrl = updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+        console.log('Document before notifyStatusChange (acceptManufacturing):', updatedDoc);
+        
         try {
           await notifyStatusChange(updatedDoc, 'Accepted by Manufacturing', name);
         } catch (notifyError) {
@@ -475,10 +481,9 @@ exports.acceptManufacturing = async (req, res) => {
 };
 
 exports.acceptEnvironment = async (req, res) => {
-  const id   = +req.params.id;
+  const id = +req.params.id;
   const name = req.user.name;
   
-  // First get the document to send in notification
   try {
     const [doc] = await db.pool.promise().query(
       `SELECT * FROM documents_nc WHERE id = ?`,
@@ -505,13 +510,14 @@ exports.acceptEnvironment = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Get updated document with PDF URL
         const [[updatedDoc]] = await db.pool.promise().query(
           `SELECT * FROM documents_nc WHERE id = ?`,
           [id]
         );
         
-        // Send notification
+        updatedDoc.PdfUrl = updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+        console.log('Document before notifyStatusChange (acceptEnvironment):', updatedDoc);
+        
         try {
           await notifyStatusChange(updatedDoc, 'Accepted by Environment', name);
         } catch (notifyError) {
@@ -527,26 +533,21 @@ exports.acceptEnvironment = async (req, res) => {
   }
 };
 
-// Add this method to retrieve and download a PDF
 exports.getPdf = (req, res) => {
   const filename = req.params.filename;
   const filePath = path.join(__dirname, '..', 'pdf', filename);
   
-  // Check if file exists
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ message: 'PDF not found' });
   }
   
-  // Send the file
   res.sendFile(filePath);
 };
 
-// Method to regenerate a PDF
 exports.regeneratePdf = async (req, res) => {
   try {
     const id = +req.params.id;
     
-    // Get document data
     const [doc] = await db.pool.promise().query(
       `SELECT * FROM documents_nc WHERE id = ?`,
       [id]
@@ -556,19 +557,17 @@ exports.regeneratePdf = async (req, res) => {
       return res.status(404).json({ message: 'Document not found' });
     }
     
-    // Generate PDF
     const pdfPath = await generateFormPDF(doc[0]);
-    const pdfUrl = getPdfUrl(doc[0].Document_id);
+    const PdfUrl = getPdfUrl(doc[0].Document_id);
     
-    // Update document with PDF URL
     await db.pool.promise().query(
       `UPDATE documents_nc SET PdfUrl = ? WHERE id = ?`,
-      [pdfUrl, id]
+      [PdfUrl, id]
     );
     
     res.json({
       message: 'PDF regenerated successfully',
-      pdfUrl: pdfUrl
+      PdfUrl
     });
   } catch (error) {
     console.error('Error regenerating PDF:', error);
