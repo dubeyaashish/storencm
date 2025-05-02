@@ -39,7 +39,8 @@ import {
   CalendarToday as CalendarIcon,
   Description as DescriptionIcon,
   GridView as GridViewIcon,
-  ViewList as ViewListIcon
+  ViewList as ViewListIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -53,7 +54,8 @@ const statusColors = {
   'Completed': 'success',
   'Rejected': 'error',
   'Send to Manufacture': 'warning',
-  'Send to Environment': 'success'
+  'Send to Environment': 'success',
+  'Send to SaleCo': 'primary'
 };
 
 const SaleCoDashboard = () => {
@@ -165,6 +167,44 @@ const SaleCoDashboard = () => {
     }
   };
 
+  // Handle completing document sent from QA
+  const handleCompleteQAReview = async (docId) => {
+    if (!window.confirm('Mark this document as reviewed?')) {
+      return;
+    }
+    
+    try {
+      await axios.post(`/api/documents/${docId}/complete-saleco-review`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      
+      // Update state locally
+      setDocs(docs.map(doc => {
+        if (doc.id !== docId) return doc;
+        return {
+          ...doc,
+          status: 'Completed'
+        };
+      }));
+      
+      // Show success notification
+      setNotification({
+        open: true,
+        message: 'Document marked as complete',
+        severity: 'success'
+      });
+    } catch (err) {
+      console.error('Error completing document:', err);
+      
+      // Show error notification
+      setNotification({
+        open: true,
+        message: err.response?.data?.message || 'Error completing document',
+        severity: 'error'
+      });
+    }
+  };
+
   // Format date function
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -259,6 +299,15 @@ const SaleCoDashboard = () => {
             <ToggleButton value="grid"><GridViewIcon /></ToggleButton>
             <ToggleButton value="table"><ViewListIcon /></ToggleButton>
           </ToggleButtonGroup>
+          
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            component={RouterLink}
+            to="/saleco/create"
+          >
+            New Document
+          </Button>
         </Box>
       </Box>
 
@@ -383,18 +432,32 @@ const SaleCoDashboard = () => {
                     </IconButton>
                   </Tooltip>
                   
-                  <Tooltip title="Delete document">
-                    <span>
+                  {doc.status === 'Created' && (
+                    <Tooltip title="Delete document">
+                      <span>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleDelete(doc.id)}
+                          color="error"
+                          disabled={doc.status !== 'Created'}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
+                  
+                  {doc.status === 'Send to SaleCo' && (
+                    <Tooltip title="Mark as complete">
                       <IconButton 
-                        size="small" 
-                        onClick={() => handleDelete(doc.id)}
-                        color="error"
-                        disabled={doc.status !== 'Created'}
+                        size="small"
+                        onClick={() => handleCompleteQAReview(doc.id)}
+                        color="success"
                       >
-                        <DeleteIcon fontSize="small" />
+                        <CheckCircleIcon fontSize="small" />
                       </IconButton>
-                    </span>
-                  </Tooltip>
+                    </Tooltip>
+                  )}
                 </CardActions>
               </Card>
             </Grid>
@@ -441,18 +504,32 @@ const SaleCoDashboard = () => {
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Delete document">
-                        <span>
+                      {doc.status === 'Created' && (
+                        <Tooltip title="Delete document">
+                          <span>
+                            <IconButton 
+                              size="small"
+                              onClick={() => handleDelete(doc.id)}
+                              color="error"
+                              disabled={doc.status !== 'Created'}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+                      
+                      {doc.status === 'Send to SaleCo' && (
+                        <Tooltip title="Mark as complete">
                           <IconButton 
                             size="small"
-                            onClick={() => handleDelete(doc.id)}
-                            color="error"
-                            disabled={doc.status !== 'Created'}
+                            onClick={() => handleCompleteQAReview(doc.id)}
+                            color="success"
                           >
-                            <DeleteIcon fontSize="small" />
+                            <CheckCircleIcon fontSize="small" />
                           </IconButton>
-                        </span>
-                      </Tooltip>
+                        </Tooltip>
+                      )}
                     </Stack>
                   </TableCell>
                 </TableRow>

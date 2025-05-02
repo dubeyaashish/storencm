@@ -19,7 +19,7 @@ import { LockOutlined, PersonAdd } from '@mui/icons-material';
 import axios from 'axios';
 import { Helmet } from 'react-helmet';
 
-const roles = ['SaleCo', 'Inventory', 'QA', 'Manufacturing', 'Environment'];
+const roles = ['SaleCo', 'Inventory', 'QA', 'Manufacturing', 'Environment', 'Reporter'];
 
 export default function StyledLogin() {
   const [tab, setTab]           = useState(0);

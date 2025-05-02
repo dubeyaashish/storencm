@@ -212,6 +212,35 @@ function App() {
                   />
                 }
               />
+              // Add these routes to App.js - place them after the SaleCo routes
+              {/* Reporter */}
+              <Route
+                path="/reporter"
+                element={
+                  <ProtectedRoute
+                    element={<SaleCoDashboard />}
+                    allowedRoles={['Reporter']}
+                  />
+                }
+              />
+              <Route
+                path="/reporter/create"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentForm />}
+                    allowedRoles={['Reporter']}
+                  />
+                }
+              />
+              <Route
+                path="/reporter/view/:documentId"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentView />}
+                    allowedRoles={['Reporter']}
+                  />
+                }
+              />
 
               {/* Two "view" routes so both patterns work */}
               <Route
@@ -228,7 +257,7 @@ function App() {
                 element={
                   <ProtectedRoute
                     element={<DocumentView />}
-                    allowedRoles={['SaleCo','QA','Inventory','Manufacturing','Environment']}
+                    allowedRoles={['SaleCo','QA','Inventory','Manufacturing','Environment','Reporter']}
                   />
                 }
               />

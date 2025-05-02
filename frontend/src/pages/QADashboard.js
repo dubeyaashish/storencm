@@ -255,7 +255,7 @@ export default function QADashboard() {
       // New status based on destination
       const newStatus = destination === 'manufacture' 
         ? 'Send to Manufacture' 
-        : 'Send to Environment';
+        : 'Send to SaleCo';
       
       // Update details & status
       await axios.put(
@@ -659,18 +659,18 @@ export default function QADashboard() {
             Manufacture
           </Button>
           <Button 
-            onClick={()=>handleSendTo('environment')} 
+            onClick={()=>handleSendTo('saleco')} 
             variant="contained" 
-            startIcon={<EnvironmentIcon />}
+            startIcon={<DescriptionIcon />}
             sx={{ 
-              bgcolor: 'success.main', 
-              color: 'success.contrastText',
+              bgcolor: 'primary.main', 
+              color: 'primary.contrastText',
               '&:hover': {
-                bgcolor: 'success.dark',
+                bgcolor: 'primary.dark',
               }
             }}
           >
-            Environment
+            SaleCo
           </Button>
         </DialogActions>
       </Dialog>

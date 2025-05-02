@@ -321,7 +321,18 @@ const Navigation = () => {
         { text: 'Environment List', path: '/environment/list', icon: <Nature /> },
       ],
       roles: ['Environment']
-    }
+    },
+    // Add this section to navigationSections array in Navigation.js
+  {
+    id: 'reporter',
+    title: 'Document Management',
+    icon: <ArticleIcon />,
+    items: [
+      { text: 'Dashboard', path: '/reporter', icon: <SpeedIcon /> },
+      { text: 'Create Document', path: '/reporter/create', icon: <NoteAddIcon /> },
+    ],
+    roles: ['Reporter']
+  },
   ];
 
   const drawer = (

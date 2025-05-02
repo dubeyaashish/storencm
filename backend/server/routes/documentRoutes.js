@@ -75,11 +75,11 @@ const upload = multer({
 });
 
 // ─── Create New Document ───────────────────────────────────────────────────────
-// (SaleCo only, handles picture1 & picture2 uploads)
+// (SaleCo/Reporter only, handles picture1 & picture2 uploads)
 router.post(
   '/',
   authenticateJWT,
-  authorizeRoles(['SaleCo']),
+  authorizeRoles(['SaleCo', 'Reporter']),
   (req, res, next) => {
     // Log request just before handling the upload
     console.log('About to process file upload. Request body:', req.body);
@@ -112,11 +112,11 @@ router.get(
   dc.getDocument
 );
 
-// ─── Delete (SaleCo only) ─────────────────────────────────────────────────────
+// ─── Delete (SaleCo/Reporter only) ─────────────────────────────────────────────────────
 router.delete(
   '/:id',
   authenticateJWT,
-  authorizeRoles(['SaleCo']),
+  authorizeRoles(['SaleCo', 'Reporter']),
   dc.deleteDocument
 );
 
@@ -140,7 +140,7 @@ router.post(
 router.put(
   '/:id/qa-details',
   authenticateJWT,
-  authorizeRoles(['QA']),
+  authorizeRoles(['QA', 'SaleCo']),
   dc.updateQADetails
 );
 
@@ -162,6 +162,14 @@ router.post(
   authenticateJWT,
   authorizeRoles(['Environment']),
   dc.acceptEnvironment
+);
+
+// ─── Complete SaleCo Review ────────────────────────────────────────────────────
+router.post(
+  '/:id/complete-saleco-review',
+  authenticateJWT,
+  authorizeRoles(['SaleCo']),
+  dc.completeSaleCoReview
 );
 
 // ─── PDF Routes ─────────────────────────────────────────────────────────────────

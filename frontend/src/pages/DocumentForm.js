@@ -161,53 +161,57 @@ export default function DocumentForm() {
 
   const handleBack = () => setActiveStep(prev => prev - 1);
 
-  const handleSubmit = async () => {
-    setLoading(true);
-    const payload = new FormData();
-    
-    // Add all text fields
-    Object.entries(formData).forEach(([k, v]) => {
-      if (k !== 'picture1' && k !== 'picture2' && v !== null && v !== '') {
-        payload.append(k, v);
-      }
+// Add this to the handleSubmit function to better debug what's being sent
+const handleSubmit = async () => {
+  setLoading(true);
+  const payload = new FormData();
+  
+  // Add all text fields
+  Object.entries(formData).forEach(([k, v]) => {
+    if (k !== 'picture1' && k !== 'picture2' && v !== null && v !== '') {
+      payload.append(k, v);
+    }
+  });
+  
+  // Add files if they exist
+  if (formData.picture1) {
+    payload.append('picture1', formData.picture1);
+  }
+  
+  if (formData.picture2) {
+    payload.append('picture2', formData.picture2);
+  }
+
+  // Debug payload
+  console.log('Submitting form with the following data:');
+  for (let pair of payload.entries()) {
+    console.log(pair[0] + ': ' + pair[1]);
+  }
+
+  try {
+    const response = await axios.post('/api/documents/', payload, {
+      headers: { 'Content-Type': 'multipart/form-data' }
     });
     
-    // Add files if they exist
-    if (formData.picture1) {
-      payload.append('picture1', formData.picture1);
-    }
+    console.log('Submit response:', response.data);
     
-    if (formData.picture2) {
-      payload.append('picture2', formData.picture2);
-    }
-
-    try {
-      // Log the payload for debugging (only key names to avoid large output)
-      console.log('Submitting form with keys:', Array.from(payload.keys()));
-      
-      const response = await axios.post('/api/documents/', payload, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
-      console.log('Submit response:', response.data);
-      
-      setFeedback({ 
-        open: true, 
-        message: 'Submitted successfully!', 
-        severity: 'success' 
-      });
-      
-      setTimeout(() => navigate('/saleco'), 1500);
-    } catch (err) {
-      console.error('[DocumentForm] submit error:', err);
-      setFeedback({
-        open: true,
-        message: err.response?.data?.message || 'Submit failed',
-        severity: 'error'
-      });
-      setLoading(false);
-    }
-  };
+    setFeedback({ 
+      open: true, 
+      message: 'Submitted successfully!', 
+      severity: 'success' 
+    });
+    
+    setTimeout(() => navigate('/saleco'), 1500);
+  } catch (err) {
+    console.error('[DocumentForm] submit error:', err);
+    setFeedback({
+      open: true,
+      message: err.response?.data?.message || 'Submit failed',
+      severity: 'error'
+    });
+    setLoading(false);
+  }
+};
 
   const StepContent = () => {
     const common = { fullWidth: true, variant: 'outlined', size: 'medium' };

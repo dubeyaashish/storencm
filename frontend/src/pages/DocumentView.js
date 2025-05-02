@@ -21,7 +21,8 @@ import {
   CheckCircle as CheckCircleIcon,
   Factory as ManufactureIcon,
   Nature as EnvironmentIcon,
-  Report as ReportIcon
+  Report as ReportIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 
 export default function DocumentView() {
@@ -77,6 +78,7 @@ export default function DocumentView() {
       'Accepted by Both': 'success',
       'Send to Manufacture': 'warning',
       'Send to Environment': 'success',
+      'Send to SaleCo': 'primary',
       'Accepted by Manufacture': 'primary',
       'Accepted by Environment': 'secondary',
       'Completed': 'success',
@@ -129,6 +131,7 @@ export default function DocumentView() {
           color={getStatusColor(doc.status)} 
           size="medium"
           icon={
+            doc.status.includes('SaleCo') ? <DescriptionIcon /> :
             doc.status.includes('Environment') ? <EnvironmentIcon /> :
             doc.status.includes('Manufacture') ? <ManufactureIcon /> :
             doc.status.includes('QA') ? <CheckCircleIcon /> :
@@ -236,7 +239,7 @@ export default function DocumentView() {
         {/* QA Assessment - Show if QA has accepted */}
         {(doc.status === 'Accepted by QA' || doc.status === 'Accepted by Both' || 
           doc.status.includes('Manufacture') || doc.status.includes('Environment') || 
-          doc.status === 'Completed') && (
+          doc.status.includes('SaleCo') || doc.status === 'Completed') && (
           <Grid item xs={12}>
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom color="primary">
@@ -264,7 +267,7 @@ export default function DocumentView() {
         {/* Inventory Assessment - Show if Inventory has accepted */}
         {(doc.status === 'Accepted by Inventory' || doc.status === 'Accepted by Both' || 
           doc.status.includes('Manufacture') || doc.status.includes('Environment') || 
-          doc.status === 'Completed') && (
+          doc.status.includes('SaleCo') || doc.status === 'Completed') && (
           <Grid item xs={12}>
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom color="primary">
@@ -325,6 +328,28 @@ export default function DocumentView() {
             </Paper>
           </Grid>
         )}
+        
+        {/* SaleCo Review - Show if sent to SaleCo */}
+        {(doc.status === 'Send to SaleCo' || doc.status === 'Completed') && (
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom color="primary">
+                SaleCo Review
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              {doc.status === 'Send to SaleCo' ? (
+                <Typography color="text.secondary">
+                  Document is pending SaleCo review
+                </Typography>
+              ) : (
+                <>
+                  <Typography><strong>SaleCo Review By:</strong> {doc.SaleCoReviewName || 'N/A'}</Typography>
+                  <Typography><strong>SaleCo Review Timestamp:</strong> {formatDate(doc.SaleCoReviewTimeStamp)}</Typography>
+                </>
+              )}
+            </Paper>
+          </Grid>
+        )}
 
         {/* Status History */}
         <Grid item xs={12}>
@@ -352,6 +377,11 @@ export default function DocumentView() {
             {doc.EnvironmentTimeStamp && (
               <Typography>
                 <strong>Accepted by Environment:</strong> {formatDate(doc.EnvironmentTimeStamp)}
+              </Typography>
+            )}
+            {doc.SaleCoReviewTimeStamp && (
+              <Typography>
+                <strong>Reviewed by SaleCo:</strong> {formatDate(doc.SaleCoReviewTimeStamp)}
               </Typography>
             )}
           </Paper>

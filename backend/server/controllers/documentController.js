@@ -4,6 +4,12 @@ const db = require('../config/db');
 const { notifyDocumentCreated, notifyStatusChange } = require('../utils/telegramNotifier');
 const { generateFormPDF, getPdfUrl } = require('../utils/pdfService');
 
+const path = require('path');
+const fs = require('fs');
+const db = require('../config/db');
+const { notifyDocumentCreated, notifyStatusChange } = require('../utils/telegramNotifier');
+const { generateFormPDF, getPdfUrl } = require('../utils/pdfService');
+
 exports.createNewDocument = async (req, res) => {
   console.log('💾 createNewDocument req.body:', req.body);
   console.log('💾 createNewDocument req.files:', req.files);
@@ -74,6 +80,9 @@ exports.createNewDocument = async (req, res) => {
       Img2
     };
 
+    // Log the document data being prepared for PDF
+    console.log('Document data for PDF:', doc);
+
     // 4) Insert into DB
     db.pool.query(
       `INSERT INTO documents_nc SET ?`,
@@ -97,6 +106,8 @@ exports.createNewDocument = async (req, res) => {
           );
           
           if (fullDoc && fullDoc.length > 0) {
+            console.log('Full document data for PDF:', fullDoc[0]);
+            
             // Generate the PDF form
             const pdfPath = await generateFormPDF(fullDoc[0]);
             
@@ -173,6 +184,8 @@ exports.createNewDocument = async (req, res) => {
     res.status(500).json({ message: ex.message });
   }
 };
+
+// Rest of the documentController.js remains the same...
 
 exports.getDocumentsByRole = (req, res) => {
   const { role, userId } = req.user;
@@ -572,5 +585,58 @@ exports.regeneratePdf = async (req, res) => {
   } catch (error) {
     console.error('Error regenerating PDF:', error);
     res.status(500).json({ message: 'Error regenerating PDF' });
+  }
+
+};
+// Add this function to documentController.js
+exports.completeSaleCoReview = async (req, res) => {
+  const id = +req.params.id;
+  
+  try {
+    const [doc] = await db.pool.promise().query(
+      `SELECT * FROM documents_nc WHERE id = ?`,
+      [id]
+    );
+    
+    if (!doc.length) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+    
+    db.pool.query(
+      `
+      UPDATE documents_nc
+      SET
+        status = 'Completed',
+        SaleCoReviewName = ?,
+        SaleCoReviewTimeStamp = NOW()
+      WHERE id = ?
+      `,
+      [req.user.name, id],
+      async (err) => {
+        if (err) {
+          console.error('[completeSaleCoReview] DB error:', err);
+          return res.status(500).json({ message: err.message });
+        }
+        
+        const [[updatedDoc]] = await db.pool.promise().query(
+          `SELECT * FROM documents_nc WHERE id = ?`,
+          [id]
+        );
+        
+        updatedDoc.PdfUrl = updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+        console.log('Document before notifyStatusChange (completeSaleCoReview):', updatedDoc);
+        
+        try {
+          await notifyStatusChange(updatedDoc, 'Completed', req.user.name);
+        } catch (notifyError) {
+          console.error('Failed to send Telegram notification:', notifyError);
+        }
+        
+        res.json({ message: 'Document marked as complete' });
+      }
+    );
+  } catch (ex) {
+    console.error('[completeSaleCoReview] Unexpected:', ex);
+    res.status(500).json({ message: ex.message });
   }
 };
