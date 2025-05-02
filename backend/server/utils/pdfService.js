@@ -2,6 +2,7 @@ const { PDFDocument } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const fs = require('fs-extra');
 const path = require('path');
+const url = require('url');
 
 // Define paths
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
@@ -286,17 +287,47 @@ async function generateFormPDF(document) {
 }
 
 /**
+ * Helper function to determine the server URL
+ * @returns {String} The server URL
+ */
+function getServerUrl() {
+  // Try to get URL from headers if available (not available here but useful pattern)
+  
+  // Order of preference for base URL:
+  // 1. DOMAIN_URL from environment variable (explicit setting)
+  // 2. BASE_URL from environment variable (backward compatibility)
+  // 3. Host from headers if available
+  // 4. Default based on environment
+  
+  if (process.env.DOMAIN_URL) {
+    return process.env.DOMAIN_URL;
+  }
+  
+  if (process.env.BASE_URL) {
+    return process.env.BASE_URL;
+  }
+  
+  // Default to relative URL in production (works with any domain)
+  // Or localhost:5000 in development
+  return process.env.NODE_ENV === 'production' 
+    ? '' // Empty string will make paths relative, which works for most setups
+    : 'http://localhost:5000';
+}
+
+/**
  * Get the URL to access a generated PDF
  * @param {String} documentId - The document ID
  * @returns {String} URL to access the PDF
  */
 function getPdfUrl(documentId) {
-  const baseUrl = process.env.BASE_URL;
-  const filename = `${documentId.replace(/\//g, '-')}.pdf`;
-  const pdfUrl = `${baseUrl}/pdf/${filename}`;
-  console.log(`Generated PDF URL: ${pdfUrl}`);
-  return pdfUrl;
-}
+    const filename = `${documentId.replace(/\//g, '-')}.pdf`;
+    // Get the server's hostname from the environment or use a default
+    const host = process.env.HOST_URL;
+    // Create a full URL
+    const pdfUrl = `${host}/pdf/${filename}`;
+    console.log(`Generated PDF URL: ${pdfUrl}`);
+    return pdfUrl;
+  }
 
 module.exports = {
   generateFormPDF,
