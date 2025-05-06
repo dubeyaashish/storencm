@@ -116,161 +116,124 @@ async function generateFormPDF(document) {
       other = !reject && !leaveit && !repack && !rework && !code0 && !destroy && !recall && !par && solution !== '';
     }
 
-    // Use a more generic approach to fill fields
-    try {
-      // Fill text fields - adapt field names based on what's in your actual PDF
-      const fields = {
-        'date': new Date(document.date).toLocaleDateString('en-GB'),
-        'Date': new Date(document.date).toLocaleDateString('en-GB'),
-        
-        'documentnumber': document.Document_id,
-        'DocumentNumber': document.Document_id,
-        'document_number': document.Document_id,
-        
-        'productid1': document.Product_id,
-        'ProductID': document.Product_id,
-        'product_id': document.Product_id,
-        
-        'description': document.Description,
-        'Description': document.Description,
-        
-        'LotNoRow': document.Lot_No,
-        'LotNo': document.Lot_No,
-        'lot_no': document.Lot_No,
-        
-        'size1': document.Product_size,
-        'Size': document.Product_size,
-        'size': document.Product_size,
-        
-        'qty1': document.Quantity?.toString(),
-        'Quantity': document.Quantity?.toString(),
-        'quantity': document.Quantity?.toString(),
-        
-        'issuefound1': document.Issue_Found,
-        'IssueFound': document.Issue_Found,
-        'issue_found': document.Issue_Found,
-        
-        'foundeename': document.Foundee,
-        'Foundee': document.Foundee,
-        'foundee': document.Foundee,
-        
-        'fill_5': new Date(document.date).toLocaleDateString('en-GB'),
-        
-        'reason1': reason1,
-        'Reason1': reason1,
-        'issue_description': reason1,
-        
-        'reason2': reason2,
-        'Reason2': reason2,
-        
-        'prevention1': prevention1,
-        'Prevention1': prevention1,
-        'prevention': prevention1,
-        
-        'prevention2': prevention2,
-        'Prevention2': prevention2,
-        
-        // QA fields
-        'comment1': comment1,
-        'Comment1': comment1,
-        'qa_solution_description': comment1,
-        
-        'comment2': comment2,
-        'Comment2': comment2,
-        
-        'email': document.Person1,
-        'Email': document.Person1,
-        'person1': document.Person1,
-        
-        'email2': document.Person2,
-        'Email2': document.Person2,
-        'person2': document.Person2,
-        
-        'name3': document.QAName,
-        'QAName': document.QAName,
-        'qa_name': document.QAName,
-        
-        'price': document.DamageCost?.toString(),
-        'Price': document.DamageCost?.toString(),
-        'damage_cost': document.DamageCost?.toString()
-      };
-
-      // Try to fill all possible field variations
-      Object.entries(fields).forEach(([fieldName, value]) => {
-        if (!value) return;
-        
-        try {
-          const field = form.getTextField(fieldName);
-          if (field) {
-            field.setText(value);
-            console.log(`Set field ${fieldName} to "${value}"`);
-            
-            // Set font and font size for all text fields
-            try {
-              field.updateAppearances(thaiFont, (appearance) => ({
-                ...appearance,
-                fontSize: 6
-              }));
-            } catch (fontError) {
-              console.warn(`Could not apply font to field ${fieldName}:`, fontError.message);
-            }
-          }
-        } catch (fieldError) {
-          // Field doesn't exist, just continue
-        }
-      });
-
-      // Handle checkboxes
-      const checkboxes = {
-        'reject': reject,
-        'Reject': reject,
-        
-        'leaveit': leaveit,
-        'LeaveIt': leaveit,
-        
-        'repack': repack,
-        'Repack': repack,
-        
-        'rework': rework,
-        'Rework': rework,
-        
-        'code0': code0,
-        'Code0': code0,
-        
-        'destroy': destroy,
-        'Destroy': destroy,
-        
-        'recall': recall,
-        'Recall': recall,
-        
-        'par': par,
-        'Par': par,
-        'PAR': par,
-        
-        'other': other,
-        'Other': other
-      };
-
-      // Try to check all possible checkbox variations
-      Object.entries(checkboxes).forEach(([fieldName, checked]) => {
-        try {
-          const checkbox = form.getCheckBox(fieldName);
-          if (checkbox) {
-            if (checked) {
-              checkbox.check();
-              console.log(`Checked checkbox ${fieldName}`);
-            } else {
-              checkbox.uncheck();
-            }
-          }
-        } catch (checkboxError) {
-          // Checkbox doesn't exist, just continue
-        }
-      });
+    // Text fields to fill with consistent font
+    const fieldsToFill = {
+      'date': new Date(document.date).toLocaleDateString('en-GB'),
+      'Date': new Date(document.date).toLocaleDateString('en-GB'),
       
-    } catch (formError) {
-      console.error('Error filling form:', formError);
+      'documentnumber': document.Document_id,      
+      'productid1': document.Product_id,
+      'description': document.Description,
+      'LotNoRow1': document.Lot_No,
+      'size1': document.Product_size,
+      'qty1': document.Quantity?.toString(),
+      'issuefound1': document.Issue_Found,
+      'foundeename': document.Foundee,
+      'fill_5': new Date(document.date).toLocaleDateString('en-GB'),
+      'reason1': reason1,
+      'reason2': reason2,
+      'prevent1': prevention1,
+      'prevent2': prevention2,
+      
+      // QA fields
+      'comment1': comment1,
+      'comment2': comment2,
+      'email': document.Person1,
+      'email2': document.Person2,
+      'name3': document.QAName,
+      'price': document.DamageCost?.toString()
+    };
+
+    // Fill all text fields with consistent font and handle multiple widgets
+    Object.entries(fieldsToFill).forEach(([fieldName, value]) => {
+      if (!value) return;
+      
+      try {
+        const field = form.getTextField(fieldName);
+        if (field) {
+          // Set the text value
+          field.setText(value);
+          
+          // Get all widgets for this field
+          const widgets = field.acroField.getWidgets();
+          
+          if (widgets && widgets.length > 0) {
+            console.log(`Found ${widgets.length} widgets for field ${fieldName}`);
+            
+            // Apply font to each widget
+            widgets.forEach((widget, index) => {
+              try {
+                // Set the default appearance for font size 6
+                widget.setDefaultAppearance('NotoSansThai-Regular 6 Tf 0 g');
+                
+                // Update the field appearance for this widget
+                field.updateAppearances(widget);
+                
+                console.log(`Set widget ${index} for field ${fieldName} with font size 6`);
+              } catch (widgetError) {
+                console.log(`Error setting widget ${index} for field ${fieldName}:`, widgetError.message);
+              }
+            });
+          } else {
+            // Single widget
+            field.setFontSize(6);
+            field.updateAppearances(thaiFont);
+          }
+          
+          console.log(`Set field ${fieldName} to "${value}"`);
+        }
+      } catch (fieldError) {
+        console.log(`Field ${fieldName} not found or error:`, fieldError.message);
+      }
+    });
+
+    // Handle checkboxes
+    const checkboxes = {
+      'reject': reject,
+      'leaveit': leaveit,
+      'repack': repack,
+      'rework': rework,
+      'code0': code0,
+      'destroy': destroy,
+      'recall': recall,
+      'par': par,
+      'other': other
+    };
+
+    // Try to check all possible checkbox variations
+    Object.entries(checkboxes).forEach(([fieldName, checked]) => {
+      try {
+        const checkbox = form.getCheckBox(fieldName);
+        if (checkbox) {
+          if (checked) {
+            checkbox.check();
+            console.log(`Checked checkbox ${fieldName}`);
+          } else {
+            checkbox.uncheck();
+          }
+        }
+      } catch (checkboxError) {
+        // Checkbox doesn't exist, just continue
+      }
+    });
+
+    // Final pass to ensure all foundeename fields are consistent
+    try {
+      const foundeeField = form.getTextField('foundeename');
+      if (foundeeField) {
+        const widgets = foundeeField.acroField.getWidgets();
+        widgets.forEach((widget, index) => {
+          widget.setDefaultAppearance('NotoSansThai-Regular 6 Tf 0 g');
+          console.log(`Final pass: Updated foundeename widget ${index} with font size 6`);
+        });
+      }
+    } catch (error) {
+      console.log('Error in final foundeename pass:', error.message);
     }
+
+    // Flatten the form to make it non-editable
+    form.flatten();
+    console.log('PDF form has been flattened');
 
     // Save the filled PDF
     const pdfBytes = await pdfDoc.save();
@@ -291,13 +254,10 @@ async function generateFormPDF(document) {
  * @returns {String} The server URL
  */
 function getServerUrl() {
-  // Try to get URL from headers if available (not available here but useful pattern)
-  
   // Order of preference for base URL:
   // 1. DOMAIN_URL from environment variable (explicit setting)
   // 2. BASE_URL from environment variable (backward compatibility)
-  // 3. Host from headers if available
-  // 4. Default based on environment
+  // 3. Default based on environment
   
   if (process.env.DOMAIN_URL) {
     return process.env.DOMAIN_URL;

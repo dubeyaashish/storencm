@@ -4,12 +4,6 @@ const db = require('../config/db');
 const { notifyDocumentCreated, notifyStatusChange } = require('../utils/telegramNotifier');
 const { generateFormPDF, getPdfUrl } = require('../utils/pdfService');
 
-const path = require('path');
-const fs = require('fs');
-const db = require('../config/db');
-const { notifyDocumentCreated, notifyStatusChange } = require('../utils/telegramNotifier');
-const { generateFormPDF, getPdfUrl } = require('../utils/pdfService');
-
 exports.createNewDocument = async (req, res) => {
   console.log('💾 createNewDocument req.body:', req.body);
   console.log('💾 createNewDocument req.files:', req.files);
