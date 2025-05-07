@@ -161,7 +161,7 @@ export default function DocumentForm() {
 
   const handleBack = () => setActiveStep(prev => prev - 1);
 
-// Add this to the handleSubmit function to better debug what's being sent
+  
 const handleSubmit = async () => {
   setLoading(true);
   const payload = new FormData();
@@ -197,11 +197,13 @@ const handleSubmit = async () => {
     
     setFeedback({ 
       open: true, 
-      message: 'Submitted successfully!', 
+      message: 'Document submitted successfully!', 
       severity: 'success' 
     });
     
-    setTimeout(() => navigate('/saleco'), 1500);
+    // Get current role and redirect to appropriate dashboard
+    const role = localStorage.getItem('role').toLowerCase();
+    setTimeout(() => navigate(`/${role}`), 1500);
   } catch (err) {
     console.error('[DocumentForm] submit error:', err);
     setFeedback({
@@ -212,7 +214,6 @@ const handleSubmit = async () => {
     setLoading(false);
   }
 };
-
   const StepContent = () => {
     const common = { fullWidth: true, variant: 'outlined', size: 'medium' };
     switch (activeStep) {

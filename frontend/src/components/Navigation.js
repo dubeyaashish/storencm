@@ -288,6 +288,7 @@ const Navigation = () => {
       icon: <TuneIcon />,
       items: [
         { text: 'Dashboard', path: '/qa', icon: <SpeedIcon /> },
+        { text: 'Create Document', path: '/qa/create', icon: <NoteAddIcon /> },
         { text: 'Review Documents', path: '/qa/review', icon: <ArticleIcon /> },
       ],
       roles: ['QA']
@@ -298,6 +299,7 @@ const Navigation = () => {
       icon: <InventoryIcon />,
       items: [
         { text: 'Dashboard', path: '/inventory', icon: <SpeedIcon /> },
+        { text: 'Create Document', path: '/inventory/create', icon: <NoteAddIcon /> },
         { text: 'Inventory List', path: '/inventory/list', icon: <InventoryIcon /> },
       ],
       roles: ['Inventory']
@@ -308,6 +310,7 @@ const Navigation = () => {
       icon: <Factory />,
       items: [
         { text: 'Dashboard', path: '/manufacturing', icon: <SpeedIcon /> },
+        { text: 'Create Document', path: '/manufacturing/create', icon: <NoteAddIcon /> },
         { text: 'Manufacturing List', path: '/manufacturing/list', icon: <Factory /> },
       ],
       roles: ['Manufacturing']
@@ -318,6 +321,7 @@ const Navigation = () => {
       icon: <Nature />,
       items: [
         { text: 'Dashboard', path: '/environment', icon: <SpeedIcon /> },
+        { text: 'Create Document', path: '/environment/create', icon: <NoteAddIcon /> },
         { text: 'Environment List', path: '/environment/list', icon: <Nature /> },
       ],
       roles: ['Environment']

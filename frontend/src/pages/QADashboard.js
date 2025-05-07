@@ -46,7 +46,9 @@ import {
   Factory as ManufactureIcon,
   Nature as EnvironmentIcon,
   CalendarToday as CalendarIcon,
-  Description as DescriptionIcon
+  Description as DescriptionIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
@@ -289,6 +291,36 @@ export default function QADashboard() {
     }
   };
 
+  // Handle document deletion
+  const handleDelete = async (docId) => {
+    if (!window.confirm('Are you sure you want to delete this document?')) {
+      return;
+    }
+    
+    try {
+      await axios.delete(`/api/documents/${docId}`);
+      
+      // Remove document from state
+      const updatedDocs = docs.filter(doc => doc.id !== docId);
+      setDocs(updatedDocs);
+      
+// Show success notification
+      setNotification({
+        open: true,
+        message: 'Document deleted successfully',
+        severity: 'success'
+      });
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      // Show error notification
+      setNotification({
+        open: true,
+        message: err.response?.data?.message || 'Error deleting document',
+        severity: 'error'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ p:3, textAlign:'center' }}>
@@ -325,6 +357,15 @@ export default function QADashboard() {
             <ToggleButton value="grid"><GridViewIcon/></ToggleButton>
             <ToggleButton value="table"><ViewListIcon/></ToggleButton>
           </ToggleButtonGroup>
+          {/* Add Create Document Button */}
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            component={RouterLink}
+            to="/qa/create"
+          >
+            New Document
+          </Button>
         </Box>
       </Box>
 
@@ -481,6 +522,19 @@ export default function QADashboard() {
                     <VisibilityIcon/>
                   </IconButton>
                   
+                  {/* Delete button for created documents */}
+                  {doc.status === 'Created' && (
+                    <Tooltip title="Delete document">
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDelete(doc.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  
                   {/* Accept button for documents that need acceptance */}
                   {(doc.status==='Created' || doc.status==='Accepted by Inventory') && (
                     <Button
@@ -541,6 +595,19 @@ export default function QADashboard() {
                       <IconButton component={RouterLink} to={`/view/${doc.Document_id}`} size="small">
                         <VisibilityIcon fontSize="small"/>
                       </IconButton>
+
+                      {/* Delete button for created documents */}
+                      {doc.status === 'Created' && (
+                        <Tooltip title="Delete document">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleDelete(doc.id)}
+                            color="error"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       
                       {/* Accept button for documents that need acceptance */}
                       {(doc.status==='Created' || doc.status==='Accepted by Inventory') && (

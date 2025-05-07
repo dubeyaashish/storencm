@@ -168,6 +168,45 @@ function App() {
                   />
                 }
               />
+              <Route
+                path="/qa/create"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentForm />}
+                    allowedRoles={['QA']}
+                  />
+                }
+              />
+
+              <Route
+                path="/inventory/create"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentForm />}
+                    allowedRoles={['Inventory']}
+                  />
+                }
+              />
+
+              <Route
+                path="/manufacturing/create"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentForm />}
+                    allowedRoles={['Manufacturing']}
+                  />
+                }
+              />
+
+              <Route
+                path="/environment/create"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentForm />}
+                    allowedRoles={['Environment']}
+                  />
+                }
+              />
 
               {/* QA dashboard */}
               <Route
@@ -258,6 +297,45 @@ function App() {
                   <ProtectedRoute
                     element={<DocumentView />}
                     allowedRoles={['SaleCo','QA','Inventory','Manufacturing','Environment','Reporter']}
+                  />
+                }
+              />
+              <Route
+                path="/qa/view/:documentId"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentView />}
+                    allowedRoles={['QA']}
+                  />
+                }
+              />
+
+              <Route
+                path="/inventory/view/:documentId"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentView />}
+                    allowedRoles={['Inventory']}
+                  />
+                }
+              />
+
+              <Route
+                path="/manufacturing/view/:documentId"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentView />}
+                    allowedRoles={['Manufacturing']}
+                  />
+                }
+              />
+
+              <Route
+                path="/environment/view/:documentId"
+                element={
+                  <ProtectedRoute
+                    element={<DocumentView />}
+                    allowedRoles={['Environment']}
                   />
                 }
               />

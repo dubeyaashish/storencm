@@ -28,7 +28,9 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Button,
-  Tooltip
+  Tooltip,
+  Pagination,
+  Stack
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -37,7 +39,9 @@ import {
   ViewList as ViewListIcon,
   CheckCircle as CheckCircleIcon,
   CalendarToday as CalendarIcon,
-  Nature as EnvironmentIcon
+  Nature as EnvironmentIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
@@ -49,7 +53,7 @@ const statusColors = {
   'Accepted by QA': 'info',
   'Accepted by Both': 'success',
   'Send to Manufacture': 'warning',
-  'Send to Environment': 'success',
+'Send to Environment': 'success',
   'Accepted by Environment': 'success',
   'Completed': 'success',
   'Rejected': 'error'
@@ -70,6 +74,10 @@ export default function EnvironmentDashboard() {
     accepted: 0, 
     completed: 0
   });
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [rowsPerPage] = useState(9); // 9 for grid (3x3), 10 for table
 
   // Install axios interceptors once
   useEffect(() => {
@@ -134,7 +142,14 @@ export default function EnvironmentDashboard() {
       );
     }
     setFilteredDocs(fd);
+    setPage(1); // Reset to first page when filters change
   }, [docs, tabValue, searchTerm]);
+
+  // Calculate current documents to display
+  const currentDocs = filteredDocs.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  );
 
   // Async fetch function
   async function fetchDocuments() {
@@ -168,6 +183,37 @@ export default function EnvironmentDashboard() {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
 
+  // Handle document deletion
+  const handleDelete = async (docId) => {
+    if (!window.confirm('Are you sure you want to delete this document?')) {
+      return;
+    }
+    
+    try {
+      await axios.delete(`/api/documents/${docId}`);
+      
+      // Remove document from state
+      const updatedDocs = docs.filter(doc => doc.id !== docId);
+      setDocs(updatedDocs);
+      
+      // Show success notification
+      setNotification({
+        open: true,
+        message: 'Document deleted successfully',
+        severity: 'success'
+      });
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      
+      // Show error notification
+      setNotification({
+        open: true,
+        message: err.response?.data?.message || 'Error deleting document',
+        severity: 'error'
+      });
+    }
+  };
+
   // Handle Environment accept
   const handleAccept = async (doc) => {
     if (!window.confirm('Accept this document for environmental assessment?')) return;
@@ -199,6 +245,11 @@ export default function EnvironmentDashboard() {
         severity: 'error' 
       });
     }
+  };
+
+  // Handle page change
+  const handlePageChange = (event, value) => {
+    setPage(value);
   };
 
   if (loading) {
@@ -242,6 +293,16 @@ export default function EnvironmentDashboard() {
             <ToggleButton value="grid"><GridViewIcon/></ToggleButton>
             <ToggleButton value="table"><ViewListIcon/></ToggleButton>
           </ToggleButtonGroup>
+          
+          {/* Add Create Document Button */}
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            component={RouterLink}
+            to="/environment/create"
+          >
+            New Document
+          </Button>
         </Box>
       </Box>
 
@@ -299,7 +360,7 @@ export default function EnvironmentDashboard() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredDocs.map(doc => (
+              {currentDocs.map(doc => (
                 <TableRow key={doc.id} hover>
                   <TableCell>{doc.Document_id}</TableCell>
                   <TableCell>{doc.Product_id}</TableCell>
@@ -310,23 +371,39 @@ export default function EnvironmentDashboard() {
                     <Chip label={doc.status} color={statusColors[doc.status]} />
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="View details">
-                      <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
-                        <VisibilityIcon/>
-                      </IconButton>
-                    </Tooltip>
-                    {doc.status === 'Send to Environment' && (
-                      <Tooltip title="Accept document">
-                        <Button
-                          size="small"
-                          startIcon={<CheckCircleIcon />}
-                          onClick={() => handleAccept(doc)}
-                          color="success"
-                        >
-                          Accept
-                        </Button>
+                    <Stack direction="row" spacing={1}>
+                      <Tooltip title="View details">
+                        <IconButton component={RouterLink} to={`/view/${doc.Document_id}`} size="small">
+                          <VisibilityIcon fontSize="small"/>
+                        </IconButton>
                       </Tooltip>
-                    )}
+                      
+                      {doc.status === 'Created' && (
+                        <Tooltip title="Delete document">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleDelete(doc.id)}
+                            color="error"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      
+                      {doc.status === 'Send to Environment' && (
+                        <Tooltip title="Accept document">
+                          <Button
+                            size="small"
+                            startIcon={<CheckCircleIcon />}
+                            onClick={() => handleAccept(doc)}
+                            color="success"
+                            variant="contained"
+                          >
+                            Accept
+                          </Button>
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
@@ -338,7 +415,7 @@ export default function EnvironmentDashboard() {
       {/* Grid View */}
       {viewMode === 'grid' && (
         <Grid container spacing={2}>
-          {filteredDocs.map(doc => (
+          {currentDocs.map(doc => (
             <Grid item xs={12} md={6} lg={4} key={doc.id}>
               <Card
                 sx={{
@@ -413,6 +490,19 @@ export default function EnvironmentDashboard() {
                   <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
                     <VisibilityIcon/>
                   </IconButton>
+                  
+                  {doc.status === 'Created' && (
+                    <Tooltip title="Delete document">
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDelete(doc.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  
                   {doc.status === 'Send to Environment' && (
                     <Button
                       variant="contained" 
@@ -429,6 +519,20 @@ export default function EnvironmentDashboard() {
             </Grid>
           ))}
         </Grid>
+      )}
+
+      {/* Pagination */}
+      {filteredDocs.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination 
+            count={Math.ceil(filteredDocs.length / rowsPerPage)} 
+            page={page} 
+            onChange={handlePageChange}
+            color="primary"
+            showFirstButton 
+            showLastButton
+          />
+        </Box>
       )}
 
       {/* Snackbar */}

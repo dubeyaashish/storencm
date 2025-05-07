@@ -42,7 +42,9 @@ import {
   CheckCircle as CheckCircleIcon,
   CalendarToday as CalendarIcon,
   LocalShipping as ShippingIcon,
-  Inventory as InventoryIcon
+  Inventory as InventoryIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
@@ -192,6 +194,36 @@ export default function InventoryDashboard() {
     }
   };
 
+  // Handle document deletion
+  const handleDelete = async (docId) => {
+    if (!window.confirm('Are you sure you want to delete this document?')) {
+      return;
+    }
+    
+    try {
+      await axios.delete(`/api/documents/${docId}`);
+      
+      // Remove document from state
+      const updatedDocs = docs.filter(doc => doc.id !== docId);
+      setDocs(updatedDocs);
+      
+      // Show success notification
+      setNotification({
+        open: true,
+        message: 'Document deleted successfully',
+        severity: 'success'
+      });
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      // Show error notification
+      setNotification({
+        open: true,
+        message: err.response?.data?.message || 'Error deleting document',
+        severity: 'error'
+      });
+    }
+  };
+
   // Handle page change
   const handlePageChange = (event, value) => {
     setPage(value);
@@ -245,6 +277,16 @@ export default function InventoryDashboard() {
             <ToggleButton value="grid"><GridViewIcon/></ToggleButton>
             <ToggleButton value="table"><ViewListIcon/></ToggleButton>
           </ToggleButtonGroup>
+          
+          {/* Add Create Document Button */}
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            component={RouterLink}
+            to="/inventory/create"
+          >
+            New Document
+          </Button>
         </Box>
       </Box>
 
@@ -330,8 +372,7 @@ export default function InventoryDashboard() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Doc #</TableCell>
-                <TableCell>Product ID</TableCell>
+              <TableCell>Product ID</TableCell>
                 <TableCell>Lot No</TableCell>
                 <TableCell>Quantity</TableCell>
                 <TableCell>Issue</TableCell>
@@ -357,16 +398,28 @@ export default function InventoryDashboard() {
                           <VisibilityIcon fontSize="small"/>
                         </IconButton>
                       </Tooltip>
+                      
                       {doc.status === 'Created' && (
-                        <Tooltip title="Accept document">
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => handleAccept(doc)}
-                          >
-                            <CheckCircleIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        <>
+                          <Tooltip title="Accept document">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => handleAccept(doc)}
+                            >
+                              <CheckCircleIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete document">
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleDelete(doc.id)}
+                              color="error"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </>
                       )}
                     </Stack>
                   </TableCell>
@@ -473,16 +526,26 @@ export default function InventoryDashboard() {
                   <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
                     <VisibilityIcon/>
                   </IconButton>
+                  
                   {doc.status === 'Created' && (
-                    <Button
-                      variant="contained" 
-                      color="primary"
-                      size="small"
-                      startIcon={<CheckCircleIcon/>}
-                      onClick={() => handleAccept(doc)}
-                    >
-                      Accept
-                    </Button>
+                    <>
+                      <Button
+                        variant="contained" 
+                        color="primary"
+                        size="small"
+                        startIcon={<CheckCircleIcon/>}
+                        onClick={() => handleAccept(doc)}
+                      >
+                        Accept
+                      </Button>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDelete(doc.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </>
                   )}
                 </CardActions>
               </Card>

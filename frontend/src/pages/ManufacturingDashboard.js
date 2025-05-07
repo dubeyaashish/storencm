@@ -27,7 +27,9 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Button,
-  Tooltip
+  Tooltip,
+  Pagination,
+  Stack
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -36,7 +38,9 @@ import {
   ViewList as ViewListIcon,
   CheckCircle as CheckCircleIcon,
   CalendarToday as CalendarIcon,
-  Factory as ManufactureIcon
+  Factory as ManufactureIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
@@ -70,6 +74,10 @@ export default function ManufacturingDashboard() {
     accepted: 0, 
     completed: 0
   });
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [rowsPerPage] = useState(9); // 9 for grid (3x3), 10 for table
 
   // Install axios interceptors once
   useEffect(() => {
@@ -134,7 +142,14 @@ export default function ManufacturingDashboard() {
       );
     }
     setFilteredDocs(fd);
+    setPage(1); // Reset to first page when filters change
   }, [docs, tabValue, searchTerm]);
+
+  // Calculate current documents to display
+  const currentDocs = filteredDocs.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  );
 
   // Async fetch function
   async function fetchDocuments() {
@@ -201,6 +216,42 @@ export default function ManufacturingDashboard() {
     }
   };
 
+  // Handle document deletion
+  const handleDelete = async (docId) => {
+    if (!window.confirm('Are you sure you want to delete this document?')) {
+      return;
+    }
+    
+    try {
+      await axios.delete(`/api/documents/${docId}`);
+      
+      // Remove document from state
+      const updatedDocs = docs.filter(doc => doc.id !== docId);
+      setDocs(updatedDocs);
+      
+      // Show success notification
+      setNotification({
+        open: true,
+        message: 'Document deleted successfully',
+        severity: 'success'
+      });
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      
+      // Show error notification
+      setNotification({
+        open: true,
+        message: err.response?.data?.message || 'Error deleting document',
+        severity: 'error'
+      });
+    }
+  };
+
+  // Handle page change
+  const handlePageChange = (event, value) => {
+    setPage(value);
+  };
+
   if (loading) {
     return (
       <Box sx={{ p:3, textAlign:'center' }}>
@@ -242,6 +293,16 @@ export default function ManufacturingDashboard() {
             <ToggleButton value="grid"><GridViewIcon/></ToggleButton>
             <ToggleButton value="table"><ViewListIcon/></ToggleButton>
           </ToggleButtonGroup>
+          
+          {/* Add Create Document Button */}
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            component={RouterLink}
+            to="/manufacturing/create"
+          >
+            New Document
+          </Button>
         </Box>
       </Box>
 
@@ -299,7 +360,7 @@ export default function ManufacturingDashboard() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredDocs.map(doc => (
+              {currentDocs.map(doc => (
                 <TableRow key={doc.id} hover>
                   <TableCell>{doc.Document_id}</TableCell>
                   <TableCell>{doc.Product_id}</TableCell>
@@ -310,22 +371,39 @@ export default function ManufacturingDashboard() {
                     <Chip label={doc.status} color={statusColors[doc.status]} />
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="View details">
-                      <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
-                        <VisibilityIcon/>
-                      </IconButton>
-                    </Tooltip>
-                    {doc.status === 'Send to Manufacture' && (
-                      <Tooltip title="Accept document">
-                        <Button
-                          size="small"
-                          startIcon={<CheckCircleIcon />}
-                          onClick={() => handleAccept(doc)}
-                        >
-                          Accept
-                        </Button>
+                    <Stack direction="row" spacing={1}>
+                      <Tooltip title="View details">
+                        <IconButton component={RouterLink} to={`/view/${doc.Document_id}`} size="small">
+                          <VisibilityIcon fontSize="small"/>
+                        </IconButton>
                       </Tooltip>
-                    )}
+                      
+                      {doc.status === 'Created' && (
+                        <Tooltip title="Delete document">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleDelete(doc.id)}
+                            color="error"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      
+                      {doc.status === 'Send to Manufacture' && (
+                        <Tooltip title="Accept document">
+                          <Button
+                            size="small"
+                            startIcon={<CheckCircleIcon />}
+                            onClick={() => handleAccept(doc)}
+                            color="success"
+                            variant="contained"
+                          >
+                            Accept
+                          </Button>
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
@@ -335,9 +413,9 @@ export default function ManufacturingDashboard() {
       )}
 
       {/* Grid View */}
-      {viewMode === 'grid' && (
+      {viewMode === 'grid' && filteredDocs.length > 0 && (
         <Grid container spacing={2}>
-          {filteredDocs.map(doc => (
+          {currentDocs.map(doc => (
             <Grid item xs={12} md={6} lg={4} key={doc.id}>
               <Card
                 sx={{
@@ -412,6 +490,19 @@ export default function ManufacturingDashboard() {
                   <IconButton component={RouterLink} to={`/view/${doc.Document_id}`}>
                     <VisibilityIcon/>
                   </IconButton>
+                  
+                  {doc.status === 'Created' && (
+                    <Tooltip title="Delete document">
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDelete(doc.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  
                   {doc.status === 'Send to Manufacture' && (
                     <Button
                       variant="contained" 
@@ -428,6 +519,20 @@ export default function ManufacturingDashboard() {
             </Grid>
           ))}
         </Grid>
+      )}
+
+      {/* Pagination */}
+      {filteredDocs.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination 
+            count={Math.ceil(filteredDocs.length / rowsPerPage)} 
+            page={page} 
+            onChange={handlePageChange}
+            color="primary"
+            showFirstButton 
+            showLastButton
+          />
+        </Box>
       )}
 
       {/* Snackbar */}

@@ -76,12 +76,12 @@ const upload = multer({
 
 // ─── Create New Document ───────────────────────────────────────────────────────
 // (SaleCo/Reporter only, handles picture1 & picture2 uploads)
+// server/routes/documentRoutes.js - Update the create document route
 router.post(
   '/',
   authenticateJWT,
-  authorizeRoles(['SaleCo', 'Reporter']),
+  authorizeRoles(['SaleCo', 'Reporter', 'QA', 'Inventory', 'Manufacturing', 'Environment']),
   (req, res, next) => {
-    // Log request just before handling the upload
     console.log('About to process file upload. Request body:', req.body);
     console.log('Upload directory:', uploadsDir);
     next();
@@ -91,7 +91,6 @@ router.post(
     { name: 'picture2', maxCount: 1 }
   ]),
   (req, res, next) => {
-    // Log after file processing
     console.log('Files processed:', req.files);
     next();
   },
