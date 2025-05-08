@@ -1,8 +1,8 @@
 // backend/server/utils/pdfService.js
-const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
-const fontkit = require('@pdf-lib/fontkit');
+const PDFDocument = require('pdfkit');
 const fs = require('fs-extra');
 const path = require('path');
+const QRCode = require('qrcode');
 
 // Define paths
 const PDF_OUTPUT_DIR = path.join(__dirname, '..', 'pdf');
@@ -12,678 +12,453 @@ const FONTS_DIR = path.join(__dirname, '..', 'fonts');
 fs.ensureDirSync(PDF_OUTPUT_DIR);
 fs.ensureDirSync(FONTS_DIR);
 
-// Thai headers and labels
+// Thai headers and labels - direct string literals without any spaces in Thai text
 const thaiText = {
-  title: 'Non-Conformance', // Non-Conformance Report
-  document: 'Document Number', // Document #
-  date: 'วันที่', // Date
-  status: 'สถานะ', // Status
-  productInfo: 'ข้อมูลสินค้า', // Product Information
-  issueInfo: 'ข้อมูลปัญหา', // Issue Information
-  issueDesc: 'รายละเอียดปัญหา', // Issue Description
-  prevention: 'มาตรการป้องกัน', // Prevention Measure
-  qaAssessment: 'การประเมินคุณภาพ', // Quality Assurance Assessment
-  inventoryAssessment: 'การประเมินคลังสินค้า', // Inventory Assessment
-  mfgAssessment: 'การประเมินการผลิต', // Manufacturing Assessment
-  envAssessment: 'การประเมินสิ่งแวดล้อม', // Environmental Assessment
-  salecoReview: 'การทบทวนโดย SaleCo', // SaleCo Final Review
-  generated: 'สร้างเมื่อ', // Generated
-  docId: 'รหัสเอกสาร', // Document ID
-  comments: 'ความคิดเห็น', // Comments
-  solutionDesc: 'รายละเอียดการแก้ไข', // Solution Description
-  envImpact: 'ผลกระทบต่อสิ่งแวดล้อม', // Environmental Impact
-  mitigation: 'มาตรการบรรเทาผลกระทบ', // Mitigation Measures
+  title: 'Non-Conformance',
+  document: 'Document Number',
+  date: 'วันที่',
+  status: 'สถานะ',
+  productInfo: 'ข้อมูลสินค้า',
+  issueInfo: 'ข้อมูลปัญหา',
+  issueDesc: 'รายละเอียดปัญหา',
+  prevention: 'มาตรการป้องกัน',
+  qaAssessment: 'การประเมินคุณภาพ',
+  inventoryAssessment: 'การประเมินคลังสินค้า',
+  mfgAssessment: 'การประเมินการผลิต',
+  envAssessment: 'การประเมินสิ่งแวดล้อม',
+  salecoReview: 'การทบทวนโดย SaleCo',
+  generated: 'สร้างเมื่อ',
+  docId: 'รหัสเอกสาร',
+  comments: 'ความคิดเห็น',
+  solutionDesc: 'รายละเอียดการแก้ไข',
+  envImpact: 'ผลกระทบต่อสิ่งแวดล้อม',
+  mitigation: 'มาตรการบรรเทาผลกระทบ',
   
-  // Field labels
-  productId: 'รหัสสินค้า', // Product ID
-  description: 'รายละเอียด', // Description
-  serialNumber: 'หมายเลขซีเรียล', // Serial Number
-  lotNumber: 'หมายเลขล็อต', // Lot Number
-  size: 'ขนาด', // Size
-  quantity: 'จำนวน', // Quantity
-  issueFound: 'ปัญหาที่พบ', // Issue Found
-  foundee: 'ผู้พบ', // Foundee
-  department: 'แผนก', // Department
-  qaOfficer: 'เจ้าหน้าที่ QA', // QA Officer
-  timestamp: 'เวลา', // Timestamp
-  solution: 'การแก้ไข', // Solution
-  damageCost: 'ค่าเสียหาย', // Damage Cost
-  deptExpense: 'ค่าใช้จ่ายแผนก', // Department Expense
-  inventoryOfficer: 'เจ้าหน้าที่คลังสินค้า', // Inventory Officer
-  mfgOfficer: 'เจ้าหน้าที่การผลิต', // Manufacturing Officer
-  envOfficer: 'เจ้าหน้าที่สิ่งแวดล้อม', // Environment Officer
-  reviewedBy: 'ทบทวนโดย' // Reviewed By
+  // Field labels - no spaces in Thai text
+  productId: 'รหัสสินค้า',
+  description: 'รายละเอียด',
+  serialNumber: 'หมายเลขซีเรียล',
+  lotNumber: 'หมายเลขล็อต',
+  size: 'ขนาด',
+  quantity: 'จำนวน',
+  issueFound: 'ปัญหาที่พบ',
+  foundee: 'ผู้พบ',
+  department: 'แผนก',
+  qaOfficer: 'เจ้าหน้าที่QA',
+  timestamp: 'เวลา',
+  solution: 'การแก้ไข',
+  damageCost: 'ค่าเสียหาย',
+  deptExpense: 'ค่าใช้จ่ายแผนก',
+  inventoryOfficer: 'เจ้าหน้าที่คลังสินค้า',
+  mfgOfficer: 'เจ้าหน้าที่การผลิต',
+  envOfficer: 'เจ้าหน้าที่สิ่งแวดล้อม',
+  reviewedBy: 'ทบทวนโดย'
 };
 
 /**
- * Generate a PDF file from document data
+ * Generate a QR code as a PNG file
+ * @param {String} url - The URL to encode in the QR code
+ * @param {String} outputPath - The path to save the QR code PNG
+ * @returns {Promise<Boolean>} Success or failure
+ */
+async function generateQRCode(url, outputPath) {
+  try {
+    await QRCode.toFile(outputPath, url, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 200,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+    return true;
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    return false;
+  }
+}
+
+/**
+ * Format a date for display
+ * @param {Date|String} date - The date to format
+ * @returns {String} Formatted date string
+ */
+function formatDate(date) {
+  if (!date) return 'N/A';
+  try {
+    const dateObj = date instanceof Date ? date : new Date(date);
+    if (isNaN(dateObj.getTime())) return 'N/A';
+    
+    return dateObj.toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  } catch (e) {
+    return 'N/A';
+  }
+}
+
+/**
+ * Format a timestamp for display
+ * @param {Date|String} timestamp - The timestamp to format
+ * @returns {String} Formatted timestamp string
+ */
+function formatTimestamp(timestamp) {
+  if (!timestamp) return 'N/A';
+  try {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    if (isNaN(dateObj.getTime())) return 'N/A';
+    
+    return dateObj.toLocaleString('en-GB', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return 'N/A';
+  }
+}
+
+/**
+ * Generate a PDF file from document data using PDFKit
  * @param {Object} document - The document object with all field data
  * @returns {Promise<String>} Path to the generated PDF
  */
 async function generateFormPDF(document) {
-  try {
-    // Make sure we have a document ID
-    if (!document.Document_id) {
-      throw new Error('Document ID is required');
-    }
-
-    // Paths
-    const outputFilename = `${document.Document_id.replace(/\//g, '-')}.pdf`;
-    const outputPath = path.join(PDF_OUTPUT_DIR, outputFilename);
-    const thaiFontPath = path.join(FONTS_DIR, 'NotoSansThai-Regular.ttf');
-
-    // Create a new PDF document
-    const pdfDoc = await PDFDocument.create();
-    
-    // Register fontkit with the document
-    pdfDoc.registerFontkit(fontkit);
-    
-    // Add a page to the document
-    const page = pdfDoc.addPage([595, 842]); // A4 size
-    
-    // Get the standard font for fallback
-    const stdFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const stdBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    
-    // Try to embed the Thai font
-    let font = stdFont;
-    let boldFont = stdBoldFont;
-    let hasThaiFontSupport = false;
-    
+  return new Promise(async (resolve, reject) => {
     try {
-      if (fs.existsSync(thaiFontPath)) {
-        console.log('Thai font found at:', thaiFontPath);
-        const fontBytes = await fs.readFile(thaiFontPath);
-        const thaiFont = await pdfDoc.embedFont(fontBytes);
-        font = thaiFont;
-        boldFont = thaiFont; // Use the same Thai font for bold
-        hasThaiFontSupport = true;
-        console.log('Thai font embedded successfully');
-      } else {
-        console.warn('Thai font not found at:', thaiFontPath);
+      // Make sure we have a document ID
+      if (!document.Document_id) {
+        throw new Error('Document ID is required');
       }
-    } catch (fontError) {
-      console.error('Error embedding Thai font:', fontError);
-      console.log('Falling back to standard font');
-    }
-    
-    // Define colors
-    const primaryColor = rgb(0.1, 0.4, 0.7); // Deep blue
-    const secondaryColor = rgb(0.8, 0.3, 0.1); // Reddish for issues
-    const textColor = rgb(0.1, 0.1, 0.1); // Near black
-    
-    // Set drawing parameters
-    const { width, height } = page.getSize();
-    const margin = 50;
-    let currentY = height - margin;
-    const lineHeight = 16;
-    const titleSize = 24;
-    const headerSize = 14;
-    const normalSize = 10;
-    const smallSize = 8;
-    const contentIndent = 10;
-    
-    // Helper function for safe text drawing with Thai support
-    const drawText = (text, options, fallbackText) => {
-      try {
-        if (hasThaiFontSupport) {
-          // Try with Thai font
-          page.drawText(String(text || ''), {
-            ...options,
-            font: options.font === stdBoldFont ? boldFont : font
-          });
-        } else {
-          throw new Error('No Thai font support');
+
+      // Paths
+      const outputFilename = `${document.Document_id.replace(/\//g, '-')}.pdf`;
+      const outputPath = path.join(PDF_OUTPUT_DIR, outputFilename);
+      const thaiFontPath = path.join(FONTS_DIR, 'NotoSansThai-Regular.ttf');
+      const thaiFont = fs.existsSync(thaiFontPath) ? thaiFontPath : null;
+
+      // Create temp directory for QR code if needed
+      const tempDir = path.join(__dirname, '..', 'temp');
+      fs.ensureDirSync(tempDir);
+      
+      // Generate QR Code if we have a URL
+      const pdfUrl = getPdfUrl(document.Document_id);
+      const qrCodePath = path.join(tempDir, `qr-${document.Document_id.replace(/\//g, '-')}.png`);
+      let hasQRCode = false;
+      
+      if (pdfUrl) {
+        hasQRCode = await generateQRCode(pdfUrl, qrCodePath);
+      }
+
+      // Create a new PDF document with correct font settings
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50,
+        info: {
+          Title: `Non-Conformance Report - ${document.Document_id}`,
+          Author: 'Document Control System',
+          Subject: 'Non-Conformance Report',
+          Keywords: 'NC, report, quality',
+          CreationDate: new Date()
         }
-      } catch (error) {
-        // Fallback to standard font with ASCII text
-        const finalText = fallbackText || text;
-        const asciiText = String(finalText || '').replace(/[^\x00-\x7F]/g, '?');
-        
-        page.drawText(asciiText, {
-          ...options,
-          font: options.font === boldFont ? stdBoldFont : stdFont
-        });
-      }
-    };
-    
-    // Document title
-    drawText(thaiText.title, {
-      x: margin,
-      y: currentY,
-      size: titleSize,
-      font: boldFont,
-      color: primaryColor
-    }, 'Non-Conformance Report');
-    
-    currentY -= titleSize + 10;
-    
-    // Document ID and Date
-    drawText(`${thaiText.document}: ${document.Document_id}`, {
-      x: margin,
-      y: currentY,
-      size: headerSize,
-      font: boldFont,
-      color: primaryColor
-    }, `Document #: ${document.Document_id}`);
-    
-    const dateStr = document.date ? new Date(document.date).toLocaleDateString('en-GB') : 'N/A';
-    
-    drawText(`${thaiText.date}: ${dateStr}`, {
-      x: width - margin - 180,
-      y: currentY,
-      size: headerSize,
-      font: font,
-      color: textColor
-    }, `Date: ${dateStr}`);
-    
-    currentY -= headerSize * 2;
-    
-    // Status Bar
-    const statusBarWidth = width - (margin * 2);
-    page.drawRectangle({
-      x: margin,
-      y: currentY - 5,
-      width: statusBarWidth,
-      height: 25,
-      color: rgb(0.9, 0.9, 0.9),
-      borderColor: primaryColor,
-      borderWidth: 1,
-      opacity: 0.5
-    });
-    
-    // Status
-    drawText(`${thaiText.status}: ${document.status || 'Created'}`, {
-      x: margin + 10,
-      y: currentY,
-      size: headerSize,
-      font: boldFont,
-      color: primaryColor
-    }, `Status: ${document.status || 'Created'}`);
-    
-    currentY -= headerSize + 15;
-    
-    // Product Information Section
-    drawText(thaiText.productInfo, {
-      x: margin,
-      y: currentY,
-      size: headerSize,
-      font: boldFont,
-      color: primaryColor
-    }, 'Product Information');
-    
-    currentY -= headerSize + 5;
-    
-    // Product details
-    const productInfo = [
-      { thai: thaiText.productId, eng: 'Product ID:', value: String(document.Product_id || 'N/A') },
-      { thai: thaiText.description, eng: 'Description:', value: String(document.Description || 'N/A') },
-      { thai: thaiText.serialNumber, eng: 'Serial Number:', value: String(document.Sn_number || 'N/A') },
-      { thai: thaiText.lotNumber, eng: 'Lot Number:', value: String(document.Lot_No || 'N/A') },
-      { thai: thaiText.size, eng: 'Size:', value: String(document.Product_size || 'N/A') },
-      { thai: thaiText.quantity, eng: 'Quantity:', value: String(document.Quantity || 'N/A') },
-    ];
-    
-    for (const info of productInfo) {
-      drawText(info.thai, {
-        x: margin,
-        y: currentY,
-        size: normalSize,
-        font: boldFont,
-        color: textColor
-      }, info.eng);
-      
-      drawText(info.value, {
-        x: margin + 120,
-        y: currentY,
-        size: normalSize,
-        font: font,
-        color: textColor
       });
+
+      // Stream to file
+      const stream = fs.createWriteStream(outputPath);
+      doc.pipe(stream);
+
+      // Register fonts
+      if (thaiFont) {
+        // Register Thai font
+        doc.registerFont('ThaiFontRegular', thaiFontPath);
+        doc.registerFont('ThaiFontBold', thaiFontPath); // We'll use the same font for bold
+      } else {
+        // Fallback to built-in fonts
+        doc.registerFont('ThaiFontRegular', 'Helvetica');
+        doc.registerFont('ThaiFontBold', 'Helvetica-Bold');
+      }
+
+      // Define common styles & colors
+      const colors = {
+        primary: '#1a66cc', // Deep blue
+        secondary: '#cc5500', // Orange
+        text: '#333333',
+        lightGray: '#666666',
+        green: '#33a852',
+        purple: '#8031a7',
+        red: '#b30000'
+      };
+
+      const fonts = {
+        regular: 'ThaiFontRegular',
+        bold: 'ThaiFontBold'
+      };
+
+      const fontSize = {
+        title: 24,
+        header: 16,
+        subheader: 12,
+        normal: 10,
+        small: 8
+      };
+
+      // Drawing functions
+      function drawHeader() {
+        // Title
+        doc.font(fonts.bold)
+           .fontSize(fontSize.title)
+           .fillColor(colors.primary)
+           .text('Non-Conformance Report', { align: 'left' });
+
+        doc.moveDown(0.5);
+
+        // Document ID and Date with proper spacing for Thai characters
+        const y = doc.y;
+        doc.font(fonts.bold)
+           .fontSize(fontSize.header)
+           .fillColor(colors.primary)
+           .text(`${thaiText.document}: ${document.Document_id}`, { continued: false });
+
+        const dateStr = formatDate(document.date);
+        doc.font(fonts.regular)
+           .fontSize(fontSize.subheader)
+           .fillColor(colors.text)
+           .text(`${thaiText.date}: ${dateStr}`, { align: 'right' });
+
+        doc.moveDown(0.5);
+
+        // Status bar
+        doc.rect(doc.x, doc.y, doc.page.width - doc.page.margins.left - doc.page.margins.right, 30)
+           .fillOpacity(0.1)
+           .fillAndStroke(colors.primary, colors.primary);
+
+        doc.fillOpacity(1)
+           .font(fonts.bold)
+           .fontSize(fontSize.header)
+           .fillColor(colors.primary)
+           .text(`${thaiText.status}: ${document.status || 'Created'}`, doc.x + 10, doc.y + 8);
+
+        doc.moveDown(1.5);
+      }
+
+      function drawSection(title, color = colors.primary) {
+        doc.font(fonts.bold)
+           .fontSize(fontSize.header)
+           .fillColor(color)
+           .text(title, { underline: false });
+
+        doc.moveDown(0.5);
+      }
+
+      function drawField(label, value, options = {}) {
+        const { indent = 0, color = colors.text } = options;
+        
+        doc.font(fonts.bold)
+           .fontSize(fontSize.normal)
+           .fillColor(color)
+           .text(label, doc.x + indent, doc.y, { continued: true })
+           .font(fonts.regular)
+           .text(': ' + (value || 'N/A'));
+      }
+
+      function drawLongText(label, text, options = {}) {
+        const { indent = 0, color = colors.text } = options;
+        
+        doc.font(fonts.bold)
+           .fontSize(fontSize.normal)
+           .fillColor(color)
+           .text(label, doc.x + indent, doc.y);
+           
+        doc.moveDown(0.2);
+        
+        if (text) {
+          doc.font(fonts.regular)
+             .fontSize(fontSize.normal)
+             .fillColor(color)
+             .text(text, doc.x + indent + 10, doc.y);
+        } else {
+          doc.font(fonts.regular)
+             .fontSize(fontSize.normal)
+             .fillColor(colors.lightGray)
+             .text('No information provided.', doc.x + indent + 10, doc.y);
+        }
+        
+        doc.moveDown(0.5);
+      }
+
+      // Start drawing the document
+      drawHeader();
+
+      // Product Information Section
+      drawSection(thaiText.productInfo);
       
-      currentY -= lineHeight;
-    }
-    
-    currentY -= 10;
-    
-    // Issue Information Section
-    drawText(thaiText.issueInfo, {
-      x: margin,
-      y: currentY,
-      size: headerSize,
-      font: boldFont,
-      color: secondaryColor
-    }, 'Issue Information');
-    
-    currentY -= headerSize + 5;
-    
-    // Issue details
-    const issueInfo = [
-      { thai: thaiText.issueFound, eng: 'Issue Found:', value: String(document.Issue_Found || 'N/A') },
-      { thai: thaiText.foundee, eng: 'Foundee:', value: String(document.Foundee || 'N/A') },
-      { thai: thaiText.department, eng: 'Department:', value: String(document.Department || 'N/A') },
-    ];
-    
-    for (const info of issueInfo) {
-      drawText(info.thai, {
-        x: margin,
-        y: currentY,
-        size: normalSize,
-        font: boldFont,
-        color: textColor
-      }, info.eng);
+      // Use field drawing helper
+      drawField(thaiText.productId, document.Product_id);
+      drawField(thaiText.description, document.Description);
+      drawField(thaiText.serialNumber, document.Sn_number);
+      drawField(thaiText.lotNumber, document.Lot_No);
+      drawField(thaiText.size, document.Product_size);
+      drawField(thaiText.quantity, document.Quantity);
+
+      doc.moveDown(1);
+
+      // Issue Information Section
+      drawSection(thaiText.issueInfo, colors.secondary);
       
-      drawText(info.value, {
-        x: margin + 120,
-        y: currentY,
-        size: normalSize,
-        font: font,
-        color: textColor
+      drawField(thaiText.issueFound, document.Issue_Found);
+      drawField(thaiText.foundee, document.Foundee);
+      drawField(thaiText.department, document.Department);
+      
+      doc.moveDown(0.5);
+      
+      // Issue Description
+      drawLongText(thaiText.issueDesc, document.Issue_Description);
+      
+      // Prevention Measure
+      drawLongText(thaiText.prevention, document.Prevention);
+
+      doc.moveDown(0.5);
+
+      // Add QA Assessment Section if available
+      if (document.QAName || document.status?.includes('QA') || document.QASolution) {
+        drawSection(thaiText.qaAssessment, colors.green);
+        
+        drawField(thaiText.qaOfficer, document.QAName);
+        drawField(thaiText.timestamp, formatTimestamp(document.QATimeStamp));
+        drawField(thaiText.solution, document.QASolution);
+        drawField(thaiText.damageCost, document.DamageCost ? `$${document.DamageCost}` : 'N/A');
+        drawField(thaiText.deptExpense, document.DepartmentExpense);
+        
+        // QA Solution Description
+        if (document.QASolutionDescription) {
+          doc.moveDown(0.5);
+          drawLongText(thaiText.solutionDesc, document.QASolutionDescription);
+        }
+        
+        doc.moveDown(0.5);
+      }
+
+      // Add Inventory Section if available
+      if (document.InventoryName || document.status?.includes('Inventory')) {
+        drawSection(thaiText.inventoryAssessment, '#cc8800'); // Orange for Inventory
+        
+        drawField(thaiText.inventoryOfficer, document.InventoryName);
+        drawField(thaiText.timestamp, formatTimestamp(document.InventoryTimeStamp));
+        
+        doc.moveDown(0.5);
+      }
+
+      // Add Manufacturing Section if available
+      if (document.ManufacturingName || document.status?.includes('Manufacture')) {
+        drawSection(thaiText.mfgAssessment, colors.purple);
+        
+        drawField(thaiText.mfgOfficer, document.ManufacturingName);
+        drawField(thaiText.timestamp, formatTimestamp(document.ManufacturingTimeStamp));
+        
+        // Manufacturing Comments
+        if (document.ManufacturingComments) {
+          doc.moveDown(0.5);
+          drawLongText(thaiText.comments, document.ManufacturingComments);
+        }
+        
+        doc.moveDown(0.5);
+      }
+
+      // Add Environment Section if available
+      if (document.EnvironmentName || document.status?.includes('Environment')) {
+        drawSection(thaiText.envAssessment, colors.green);
+        
+        drawField(thaiText.envOfficer, document.EnvironmentName);
+        drawField(thaiText.timestamp, formatTimestamp(document.EnvironmentTimeStamp));
+        
+        // Environmental Impact
+        if (document.EnvironmentalImpact) {
+          doc.moveDown(0.5);
+          drawLongText(thaiText.envImpact, document.EnvironmentalImpact);
+        }
+        
+        // Mitigation Measures
+        if (document.MitigationMeasures) {
+          doc.moveDown(0.5);
+          drawLongText(thaiText.mitigation, document.MitigationMeasures);
+        }
+        
+        doc.moveDown(0.5);
+      }
+
+      // Add SaleCo Review Section if available
+      if (document.SaleCoReviewName || document.status === 'Completed') {
+        drawSection(thaiText.salecoReview, colors.red);
+        
+        drawField(thaiText.reviewedBy, document.SaleCoReviewName);
+        drawField(thaiText.timestamp, formatTimestamp(document.SaleCoReviewTimeStamp));
+        drawField(thaiText.status, 'Completed');
+        
+        doc.moveDown(0.5);
+      }
+
+      // Add QR Code in the top-right corner
+      if (hasQRCode) {
+        try {
+          doc.image(qrCodePath, doc.page.width - 130, 40, { width: 80 });
+          doc.fontSize(fontSize.small)
+             .font(fonts.regular)
+             .fillColor(colors.lightGray)
+             .text('Scan for PDF', doc.page.width - 130, 125, { width: 80, align: 'center' });
+        } catch (qrError) {
+          console.error('Error adding QR code to PDF:', qrError);
+        }
+      }
+
+      // Add ISO number at the bottom right
+      doc.fontSize(fontSize.small)
+         .font(fonts.regular)
+         .fillColor(colors.lightGray)
+         .text('QMS-FM-36-012 (R00.,06/10/2014)', doc.page.width - 200, doc.page.height - 50, { align: 'right' });
+
+      // Add footer with timestamp
+      const generateTime = new Date().toLocaleString('en-GB');
+      
+      doc.fontSize(fontSize.small)
+         .font(fonts.regular)
+         .fillColor(colors.lightGray)
+         .text(`${thaiText.generated}: ${generateTime}`, 50, doc.page.height - 50);
+         
+      doc.fontSize(fontSize.small)
+         .font(fonts.regular)
+         .fillColor(colors.lightGray)
+         .text(`${thaiText.docId}: ${document.Document_id}`, doc.page.width - 200, doc.page.height - 35, { align: 'right' });
+
+      // Finalize the PDF
+      doc.end();
+
+      // Wait for the stream to finish
+      stream.on('finish', () => {
+        console.log(`Generated PDF: ${outputPath}`);
+        
+        // Clean up temp QR code file if it exists
+        if (hasQRCode && fs.existsSync(qrCodePath)) {
+          fs.unlinkSync(qrCodePath);
+        }
+        
+        resolve(`/pdf/${outputFilename}`);
       });
-      
-      currentY -= lineHeight;
-    }
-    
-    currentY -= 10;
-    
-    // Issue Description
-    drawText(thaiText.issueDesc, {
-      x: margin,
-      y: currentY,
-      size: normalSize,
-      font: boldFont,
-      color: textColor
-    }, 'Issue Description');
-    
-    currentY -= lineHeight;
-    
-    if (document.Issue_Description) {
-      drawText(document.Issue_Description, {
-        x: margin + contentIndent,
-        y: currentY,
-        size: normalSize,
-        font: font,
-        color: textColor
+
+      stream.on('error', (err) => {
+        console.error('Error writing PDF:', err);
+        reject(err);
       });
-    } else {
-      drawText('No description provided.', {
-        x: margin + contentIndent,
-        y: currentY,
-        size: normalSize,
-        font: font,
-        color: rgb(0.6, 0.6, 0.6)
-      });
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      reject(error);
     }
-    
-    currentY -= lineHeight * 2;
-    
-    // Prevention Measure
-    drawText(thaiText.prevention, {
-      x: margin,
-      y: currentY,
-      size: normalSize,
-      font: boldFont,
-      color: textColor
-    }, 'Prevention Measure');
-    
-    currentY -= lineHeight;
-    
-    if (document.Prevention) {
-      drawText(document.Prevention, {
-        x: margin + contentIndent,
-        y: currentY,
-        size: normalSize,
-        font: font,
-        color: textColor
-      });
-    } else {
-      drawText('No prevention measure provided.', {
-        x: margin + contentIndent,
-        y: currentY,
-        size: normalSize,
-        font: font,
-        color: rgb(0.6, 0.6, 0.6)
-      });
-    }
-    
-    currentY -= lineHeight * 2;
-    
-    // Add QA Section if available
-    if (document.QAName || document.status?.includes('QA') || document.QASolution) {
-      drawText(thaiText.qaAssessment, {
-        x: margin,
-        y: currentY,
-        size: headerSize,
-        font: boldFont,
-        color: rgb(0.2, 0.6, 0.3) // Green for QA
-      }, 'Quality Assurance Assessment');
-      
-      currentY -= headerSize + 5;
-      
-      // QA details
-      const qaInfo = [
-        { thai: thaiText.qaOfficer, eng: 'QA Officer:', value: String(document.QAName || 'N/A') },
-        { thai: thaiText.timestamp, eng: 'Timestamp:', value: document.QATimeStamp ? new Date(document.QATimeStamp).toLocaleString('en-GB') : 'N/A' },
-        { thai: thaiText.solution, eng: 'Solution:', value: String(document.QASolution || 'N/A') },
-        { thai: thaiText.damageCost, eng: 'Damage Cost:', value: document.DamageCost ? `$${String(document.DamageCost)}` : 'N/A' },
-        { thai: thaiText.deptExpense, eng: 'Dept Expense:', value: document.DepartmentExpense ? String(document.DepartmentExpense) : 'N/A' },
-      ];
-      
-      for (const info of qaInfo) {
-        drawText(info.thai, {
-          x: margin,
-          y: currentY,
-          size: normalSize,
-          font: boldFont,
-          color: textColor
-        }, info.eng);
-        
-        drawText(info.value, {
-          x: margin + 120,
-          y: currentY,
-          size: normalSize,
-          font: font,
-          color: textColor
-        });
-        
-        currentY -= lineHeight;
-      }
-      
-      // QA Solution Description
-      if (document.QASolutionDescription) {
-        currentY -= 5;
-        
-        drawText(thaiText.solutionDesc, {
-          x: margin,
-          y: currentY,
-          size: normalSize,
-          font: boldFont,
-          color: textColor
-        }, 'Solution Description');
-        
-        currentY -= lineHeight;
-        
-        drawText(document.QASolutionDescription, {
-          x: margin + contentIndent,
-          y: currentY,
-          size: normalSize,
-          font: font,
-          color: textColor
-        });
-        
-        currentY -= lineHeight;
-      }
-      
-      currentY -= 10;
-    }
-    
-    // Add Inventory Section if available
-    if (document.InventoryName || document.status?.includes('Inventory')) {
-      drawText(thaiText.inventoryAssessment, {
-        x: margin,
-        y: currentY,
-        size: headerSize,
-        font: boldFont,
-        color: rgb(0.6, 0.4, 0.1) // Orange for Inventory
-      }, 'Inventory Assessment');
-      
-      currentY -= headerSize + 5;
-      
-      // Inventory details
-      const inventoryInfo = [
-        { thai: thaiText.inventoryOfficer, eng: 'Inventory Officer:', value: String(document.InventoryName || 'N/A') },
-        { thai: thaiText.timestamp, eng: 'Timestamp:', value: document.InventoryTimeStamp ? new Date(document.InventoryTimeStamp).toLocaleString('en-GB') : 'N/A' },
-      ];
-      
-      for (const info of inventoryInfo) {
-        drawText(info.thai, {
-          x: margin,
-          y: currentY,
-          size: normalSize,
-          font: boldFont,
-          color: textColor
-        }, info.eng);
-        
-        drawText(info.value, {
-          x: margin + 150,
-          y: currentY,
-          size: normalSize,
-          font: font,
-          color: textColor
-        });
-        
-        currentY -= lineHeight;
-      }
-      
-      currentY -= 10;
-    }
-    
-    // Add Manufacturing Section if available
-    if (document.ManufacturingName || document.status?.includes('Manufacture')) {
-      drawText(thaiText.mfgAssessment, {
-        x: margin,
-        y: currentY,
-        size: headerSize,
-        font: boldFont,
-        color: rgb(0.5, 0.2, 0.6) // Purple for Manufacturing
-      }, 'Manufacturing Assessment');
-      
-      currentY -= headerSize + 5;
-      
-      // Manufacturing details
-      const mfgInfo = [
-        { thai: thaiText.mfgOfficer, eng: 'Manufacturing Officer:', value: String(document.ManufacturingName || 'N/A') },
-        { thai: thaiText.timestamp, eng: 'Timestamp:', value: document.ManufacturingTimeStamp ? new Date(document.ManufacturingTimeStamp).toLocaleString('en-GB') : 'N/A' },
-      ];
-      
-      for (const info of mfgInfo) {
-        drawText(info.thai, {
-          x: margin,
-          y: currentY,
-          size: normalSize,
-          font: boldFont,
-          color: textColor
-        }, info.eng);
-        
-        drawText(info.value, {
-          x: margin + 150,
-          y: currentY,
-          size: normalSize,
-          font: font,
-          color: textColor
-        });
-        
-        currentY -= lineHeight;
-      }
-      
-      // Manufacturing Comments
-      if (document.ManufacturingComments) {
-        currentY -= 5;
-        
-        drawText(thaiText.comments, {
-          x: margin,
-          y: currentY,
-          size: normalSize,
-          font: boldFont,
-          color: textColor
-        }, 'Comments');
-        
-        currentY -= lineHeight;
-        
-        drawText(document.ManufacturingComments, {
-          x: margin + contentIndent,
-          y: currentY,
-          size: normalSize,
-          font: font,
-          color: textColor
-        });
-        
-        currentY -= lineHeight;
-      }
-      
-      currentY -= 10;
-    }
-    
-    // Add Environment Section if available
-    if (document.EnvironmentName || document.status?.includes('Environment')) {
-      drawText(thaiText.envAssessment, {
-        x: margin,
-        y: currentY,
-        size: headerSize,
-        font: boldFont,
-        color: rgb(0.1, 0.6, 0.3) // Green for Environment
-      }, 'Environmental Assessment');
-      
-      currentY -= headerSize + 5;
-      
-      // Environment details
-      const envInfo = [
-        { thai: thaiText.envOfficer, eng: 'Environment Officer:', value: String(document.EnvironmentName || 'N/A') },
-        { thai: thaiText.timestamp, eng: 'Timestamp:', value: document.EnvironmentTimeStamp ? new Date(document.EnvironmentTimeStamp).toLocaleString('en-GB') : 'N/A' },
-      ];
-      
-      for (const info of envInfo) {
-        drawText(info.thai, {
-          x: margin,
-          y: currentY,
-          size: normalSize,
-          font: boldFont,
-          color: textColor
-        }, info.eng);
-        
-        drawText(info.value, {
-          x: margin + 150,
-          y: currentY,
-          size: normalSize,
-          font: font,
-          color: textColor
-        });
-        
-        currentY -= lineHeight;
-      }
-      
-      // Environmental Impact
-      if (document.EnvironmentalImpact) {
-        currentY -= 5;
-        
-        drawText(thaiText.envImpact, {
-          x: margin,
-          y: currentY,
-          size: normalSize,
-          font: boldFont,
-          color: textColor
-        }, 'Environmental Impact');
-        
-        currentY -= lineHeight;
-        
-        drawText(document.EnvironmentalImpact, {
-          x: margin + contentIndent,
-          y: currentY,
-          size: normalSize,
-          font: font,
-          color: textColor
-        });
-        
-        currentY -= lineHeight;
-      }
-      
-      // Mitigation Measures
-      if (document.MitigationMeasures) {
-        currentY -= 5;
-        
-        drawText(thaiText.mitigation, {
-          x: margin,
-          y: currentY,
-          size: normalSize,
-          font: boldFont,
-          color: textColor
-        }, 'Mitigation Measures');
-        
-        currentY -= lineHeight;
-        
-        drawText(document.MitigationMeasures, {
-          x: margin + contentIndent,
-          y: currentY,
-          size: normalSize,
-          font: font,
-          color: textColor
-        });
-        
-        currentY -= lineHeight;
-      }
-      
-      currentY -= 10;
-    }
-    
-    // Add SaleCo Review Section if available
-    if (document.SaleCoReviewName || document.status === 'Completed') {
-      drawText(thaiText.salecoReview, {
-        x: margin,
-        y: currentY,
-        size: headerSize,
-        font: boldFont,
-        color: rgb(0.7, 0.3, 0.3) // Red for SaleCo
-      }, 'SaleCo Final Review');
-      
-      currentY -= headerSize + 5;
-      
-      // SaleCo details
-      const salecoInfo = [
-        { thai: thaiText.reviewedBy, eng: 'Reviewed By:', value: String(document.SaleCoReviewName || 'N/A') },
-        { thai: thaiText.timestamp, eng: 'Timestamp:', value: document.SaleCoReviewTimeStamp ? new Date(document.SaleCoReviewTimeStamp).toLocaleString('en-GB') : 'N/A' },
-        { thai: thaiText.status, eng: 'Status:', value: 'Completed' },
-      ];
-      
-      for (const info of salecoInfo) {
-        drawText(info.thai, {
-          x: margin,
-          y: currentY,
-          size: normalSize,
-          font: boldFont,
-          color: textColor
-        }, info.eng);
-        
-        drawText(info.value, {
-          x: margin + 120,
-          y: currentY,
-          size: normalSize,
-          font: font,
-          color: textColor
-        });
-        
-        currentY -= lineHeight;
-      }
-    }
-    
-    // Footer with timestamp
-    const generateTime = new Date().toLocaleString('en-GB');
-    
-    drawText(`${thaiText.generated}: ${generateTime}`, {
-      x: margin,
-      y: margin / 2,
-      size: smallSize,
-      font: font,
-      color: rgb(0.5, 0.5, 0.5)
-    }, `Generated: ${generateTime}`);
-    
-    drawText(`${thaiText.docId}: ${document.Document_id}`, {
-      x: width - margin - 200,
-      y: margin / 2,
-      size: smallSize,
-      font: font,
-      color: rgb(0.5, 0.5, 0.5)
-    }, `Document ID: ${document.Document_id}`);
-    
-    // Save the PDF file
-    const pdfBytes = await pdfDoc.save();
-    await fs.writeFile(outputPath, pdfBytes);
-    console.log(`Generated PDF: ${outputPath}`);
-    
-    return `/pdf/${outputFilename}`;
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-    throw error;
-  }
+  });
 }
 
 /**

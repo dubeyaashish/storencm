@@ -86,7 +86,7 @@ const AppLayout = ({ children }) => {
   const location = useLocation();
   const token    = localStorage.getItem('token');
   const t        = useTheme();
-  const isMobile = useMediaQuery(t.breakpoints.down('md'));
+ // const isMobile = useMediaQuery(t.breakpoints.down('md'));
   const drawerWidth = 240;
 
   // hide nav/header on login
