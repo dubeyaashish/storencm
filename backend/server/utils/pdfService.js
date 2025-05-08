@@ -66,7 +66,7 @@ async function generateQRCode(url, outputPath) {
     await QRCode.toFile(outputPath, url, {
       errorCorrectionLevel: 'H',
       margin: 1,
-      width: 200,
+      width: 150, // Reduced from 200 to make QR code smaller
       color: {
         dark: '#000000',
         light: '#FFFFFF'
@@ -101,25 +101,26 @@ function formatDate(date) {
 }
 
 /**
- * Format a timestamp for display
+ * Format a timestamp for display with both date and time
  * @param {Date|String} timestamp - The timestamp to format
  * @returns {String} Formatted timestamp string
  */
 function formatTimestamp(timestamp) {
-  if (!timestamp) return 'N/A';
+  if (!timestamp) return "N/A";
   try {
     const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
-    if (isNaN(dateObj.getTime())) return 'N/A';
+    if (isNaN(dateObj.getTime())) return "N/A";
     
     return dateObj.toLocaleString('en-GB', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit'
     });
   } catch (e) {
-    return 'N/A';
+    return "N/A";
   }
 }
 
@@ -159,6 +160,7 @@ async function generateFormPDF(document) {
       const doc = new PDFDocument({
         size: 'A4',
         margin: 50,
+        autoFirstPage: true, // Create the first page automatically
         info: {
           Title: `Non-Conformance Report - ${document.Document_id}`,
           Author: 'Document Control System',
@@ -246,18 +248,10 @@ async function generateFormPDF(document) {
         doc.moveDown(1.5);
       }
 
-      function drawSection(title, color = colors.primary) {
-        doc.font(fonts.bold)
-           .fontSize(fontSize.header)
-           .fillColor(color)
-           .text(title, { underline: false });
-
-        doc.moveDown(0.5);
-      }
-
       function drawField(label, value, options = {}) {
         const { indent = 0, color = colors.text } = options;
         
+        // Ensure there's no space between label and colon
         doc.font(fonts.bold)
            .fontSize(fontSize.normal)
            .fillColor(color)
@@ -266,175 +260,296 @@ async function generateFormPDF(document) {
            .text(': ' + (value || 'N/A'));
       }
 
-      function drawLongText(label, text, options = {}) {
-        const { indent = 0, color = colors.text } = options;
-        
-        doc.font(fonts.bold)
-           .fontSize(fontSize.normal)
-           .fillColor(color)
-           .text(label, doc.x + indent, doc.y);
-           
-        doc.moveDown(0.2);
-        
-        if (text) {
-          doc.font(fonts.regular)
-             .fontSize(fontSize.normal)
-             .fillColor(color)
-             .text(text, doc.x + indent + 10, doc.y);
-        } else {
-          doc.font(fonts.regular)
-             .fontSize(fontSize.normal)
-             .fillColor(colors.lightGray)
-             .text('No information provided.', doc.x + indent + 10, doc.y);
-        }
-        
-        doc.moveDown(0.5);
-      }
-
       // Start drawing the document
       drawHeader();
 
-      // Product Information Section
-      drawSection(thaiText.productInfo);
+      // Use a simpler approach for side-by-side layout
+      // Start with two tables side by side
+      const tableWidth = (doc.page.width - doc.page.margins.left - doc.page.margins.right - 10) / 2;
       
-      // Use field drawing helper
+      // First table - Product Information
+      const startY = doc.y;
+      
+      // Left table header
+      doc.font(fonts.bold)
+         .fontSize(fontSize.header)
+         .fillColor(colors.primary)
+         .text(thaiText.productInfo, doc.page.margins.left, startY);
+      
+      doc.y += 20; // Space after header
+      
+      // Product info fields - left column
+      doc.font(fonts.regular).fontSize(fontSize.normal);
+      const leftStartY = doc.y;
       drawField(thaiText.productId, document.Product_id);
-      drawField(thaiText.description, document.Description);
       drawField(thaiText.serialNumber, document.Sn_number);
+      drawField(thaiText.description, document.Description);
       drawField(thaiText.lotNumber, document.Lot_No);
       drawField(thaiText.size, document.Product_size);
       drawField(thaiText.quantity, document.Quantity);
-
-      doc.moveDown(1);
-
-      // Issue Information Section
-      drawSection(thaiText.issueInfo, colors.secondary);
       
+      const leftEndY = doc.y;
+      
+      // Right table - Issue Information
+      // Reset Y position but move X to right half
+      doc.y = startY;
+      doc.x = doc.page.margins.left + tableWidth + 10;
+      
+      // Right table header
+      doc.font(fonts.bold)
+         .fontSize(fontSize.header)
+         .fillColor(colors.secondary)
+         .text(thaiText.issueInfo, doc.x, startY);
+         
+      doc.y += 20; // Space after header
+      
+      // Issue info fields - right column
+      doc.font(fonts.regular).fontSize(fontSize.normal);
+      const rightStartY = doc.y;
+      
+      // Use drawField for consistent formatting across all fields
       drawField(thaiText.issueFound, document.Issue_Found);
       drawField(thaiText.foundee, document.Foundee);
       drawField(thaiText.department, document.Department);
       
-      doc.moveDown(0.5);
+      // Use drawField for Issue Description with the same formatting
+      drawField(thaiText.issueDesc, document.Issue_Description || 'N/A');
       
-      // Issue Description
-      drawLongText(thaiText.issueDesc, document.Issue_Description);
+      // Use drawField for Prevention Measure with the same formatting
+      drawField(thaiText.prevention, document.Prevention || 'N/A');
       
-      // Prevention Measure
-      drawLongText(thaiText.prevention, document.Prevention);
+      // Reset position for the next sections
+      const rightEndY = doc.y;
+      doc.x = doc.page.margins.left;
+      doc.y = Math.max(leftEndY, rightEndY) + 20; // Use the lower of the two end positions
 
-      doc.moveDown(0.5);
+      // Use consistent checks for sections
+      doc.moveDown(1);
 
-      // Add QA Assessment Section if available
-      if (document.QAName || document.status?.includes('QA') || document.QASolution) {
-        drawSection(thaiText.qaAssessment, colors.green);
+      // Debug logging to help diagnose what sections should show
+      console.log('Document status:', document.status);
+      console.log('InventoryName exists:', !!document.InventoryName);
+      console.log('InventoryTimeStamp exists:', !!document.InventoryTimeStamp);
+      console.log('QAName exists:', !!document.QAName);
+      console.log('ManufacturingName exists:', !!document.ManufacturingName);
+      console.log('EnvironmentName exists:', !!document.EnvironmentName);
+
+      // QA Assessment Section if available - improved condition check
+      if (document.QAName || (document.status && document.status.includes('QA')) || document.QASolution) {
+        doc.moveDown(0.5);
+        doc.font(fonts.bold)
+           .fontSize(fontSize.header)
+           .fillColor(colors.green)
+           .text(thaiText.qaAssessment, { continued: false });
         
-        drawField(thaiText.qaOfficer, document.QAName);
-        drawField(thaiText.timestamp, formatTimestamp(document.QATimeStamp));
+        doc.moveDown(0.3);
+        
+        // Ensure we're displaying the QA timestamp properly
+        let qaTimestamp = 'N/A';
+        if (document.QATimeStamp) {
+          try {
+            qaTimestamp = formatTimestamp(document.QATimeStamp);
+          } catch (err) {
+            console.warn('Error formatting QA timestamp:', err);
+            try {
+              qaTimestamp = formatDate(document.QATimeStamp);
+            } catch (err2) {
+              console.warn('Error formatting QA timestamp as date:', err2);
+            }
+          }
+        }
+        
+        drawField(thaiText.qaOfficer, document.QAName || 'N/A');
+        drawField(thaiText.timestamp, qaTimestamp);
         drawField(thaiText.solution, document.QASolution);
         drawField(thaiText.damageCost, document.DamageCost ? `$${document.DamageCost}` : 'N/A');
         drawField(thaiText.deptExpense, document.DepartmentExpense);
         
         // QA Solution Description
         if (document.QASolutionDescription) {
-          doc.moveDown(0.5);
-          drawLongText(thaiText.solutionDesc, document.QASolutionDescription);
+          drawField(thaiText.solutionDesc, document.QASolutionDescription);
+        }
+      }
+
+      // Fix potential issue with conditions for sections - checking both name and timestamp fields
+      // Add Inventory Section if available
+      if (document.InventoryName || document.InventoryTimeStamp || (document.status && document.status.includes('Inventory'))) {
+        doc.moveDown(0.5);
+        doc.font(fonts.bold)
+           .fontSize(fontSize.header)
+           .fillColor('#cc8800')
+           .text(thaiText.inventoryAssessment, { continued: false });
+        
+        doc.moveDown(0.3);
+        
+        // Explicitly log the inventory timestamp value to debug
+        console.log('InventoryTimeStamp value:', document.InventoryTimeStamp);
+        
+        // Ensure we're displaying the inventory timestamp properly
+        let inventoryTimestamp = 'N/A';
+        if (document.InventoryTimeStamp) {
+          try {
+            inventoryTimestamp = formatTimestamp(document.InventoryTimeStamp);
+          } catch (err) {
+            console.warn('Error formatting Inventory timestamp:', err);
+            try {
+              inventoryTimestamp = formatDate(document.InventoryTimeStamp);
+            } catch (err2) {
+              console.warn('Error formatting Inventory timestamp as date:', err2);
+            }
+          }
         }
         
-        doc.moveDown(0.5);
+        drawField(thaiText.inventoryOfficer, document.InventoryName || 'N/A');
+        drawField(thaiText.timestamp, inventoryTimestamp);
       }
 
-      // Add Inventory Section if available
-      if (document.InventoryName || document.status?.includes('Inventory')) {
-        drawSection(thaiText.inventoryAssessment, '#cc8800'); // Orange for Inventory
-        
-        drawField(thaiText.inventoryOfficer, document.InventoryName);
-        drawField(thaiText.timestamp, formatTimestamp(document.InventoryTimeStamp));
-        
+      // Add Manufacturing Section if available - checking both name and timestamp fields
+      if (document.ManufacturingName || document.ManufacturingTimeStamp || (document.status && document.status.includes('Manufacture'))) {
         doc.moveDown(0.5);
-      }
-
-      // Add Manufacturing Section if available
-      if (document.ManufacturingName || document.status?.includes('Manufacture')) {
-        drawSection(thaiText.mfgAssessment, colors.purple);
+        doc.font(fonts.bold)
+           .fontSize(fontSize.header)
+           .fillColor(colors.purple)
+           .text(thaiText.mfgAssessment, { continued: false });
+        
+        doc.moveDown(0.3);
+        
+        // Handle the Manufacturing timestamp field which has a different type in the database (date instead of datetime)
+        let mfgTimestamp = 'N/A';
+        if (document.ManufacturingTimeStamp) {
+          try {
+            mfgTimestamp = formatTimestamp(document.ManufacturingTimeStamp);
+          } catch (err) {
+            console.warn('Error formatting Manufacturing timestamp:', err);
+            // Try a different format if it's a date-only field
+            try {
+              mfgTimestamp = formatDate(document.ManufacturingTimeStamp);
+            } catch (err2) {
+              console.warn('Error formatting Manufacturing timestamp as date:', err2);
+            }
+          }
+        }
         
         drawField(thaiText.mfgOfficer, document.ManufacturingName);
-        drawField(thaiText.timestamp, formatTimestamp(document.ManufacturingTimeStamp));
+        drawField(thaiText.timestamp, mfgTimestamp);
         
         // Manufacturing Comments
         if (document.ManufacturingComments) {
-          doc.moveDown(0.5);
-          drawLongText(thaiText.comments, document.ManufacturingComments);
+          drawField(thaiText.comments, document.ManufacturingComments);
         }
-        
-        doc.moveDown(0.5);
       }
 
-      // Add Environment Section if available
-      if (document.EnvironmentName || document.status?.includes('Environment')) {
-        drawSection(thaiText.envAssessment, colors.green);
+      // Add Environment Section if available - checking both name and timestamp fields
+      if (document.EnvironmentName || document.EnvironmentTimeStamp || (document.status && document.status.includes('Environment'))) {
+        doc.moveDown(0.5);
+        doc.font(fonts.bold)
+           .fontSize(fontSize.header)
+           .fillColor(colors.green)
+           .text(thaiText.envAssessment, { continued: false });
         
-        drawField(thaiText.envOfficer, document.EnvironmentName);
-        drawField(thaiText.timestamp, formatTimestamp(document.EnvironmentTimeStamp));
+        doc.moveDown(0.3);
+        
+        // Ensure we're displaying the Environment timestamp properly
+        let envTimestamp = 'N/A';
+        if (document.EnvironmentTimeStamp) {
+          try {
+            envTimestamp = formatTimestamp(document.EnvironmentTimeStamp);
+          } catch (err) {
+            console.warn('Error formatting Environment timestamp:', err);
+            try {
+              envTimestamp = formatDate(document.EnvironmentTimeStamp);
+            } catch (err2) {
+              console.warn('Error formatting Environment timestamp as date:', err2);
+            }
+          }
+        }
+        
+        drawField(thaiText.envOfficer, document.EnvironmentName || 'N/A');
+        drawField(thaiText.timestamp, envTimestamp);
         
         // Environmental Impact
         if (document.EnvironmentalImpact) {
-          doc.moveDown(0.5);
-          drawLongText(thaiText.envImpact, document.EnvironmentalImpact);
+          drawField(thaiText.envImpact, document.EnvironmentalImpact);
         }
         
         // Mitigation Measures
         if (document.MitigationMeasures) {
-          doc.moveDown(0.5);
-          drawLongText(thaiText.mitigation, document.MitigationMeasures);
+          drawField(thaiText.mitigation, document.MitigationMeasures);
         }
-        
-        doc.moveDown(0.5);
       }
 
       // Add SaleCo Review Section if available
-      if (document.SaleCoReviewName || document.status === 'Completed') {
-        drawSection(thaiText.salecoReview, colors.red);
-        
-        drawField(thaiText.reviewedBy, document.SaleCoReviewName);
-        drawField(thaiText.timestamp, formatTimestamp(document.SaleCoReviewTimeStamp));
-        drawField(thaiText.status, 'Completed');
-        
+      if (document.SaleCoReviewName || document.SaleCoReviewTimeStamp || document.status === 'Completed') {
         doc.moveDown(0.5);
+        doc.font(fonts.bold)
+           .fontSize(fontSize.header)
+           .fillColor(colors.red)
+           .text(thaiText.salecoReview, { continued: false });
+        
+        doc.moveDown(0.3);
+        
+        // Ensure we're displaying the SaleCo timestamp properly
+        let salecoTimestamp = 'N/A';
+        if (document.SaleCoReviewTimeStamp) {
+          try {
+            salecoTimestamp = formatTimestamp(document.SaleCoReviewTimeStamp);
+          } catch (err) {
+            console.warn('Error formatting SaleCo timestamp:', err);
+            try {
+              salecoTimestamp = formatDate(document.SaleCoReviewTimeStamp);
+            } catch (err2) {
+              console.warn('Error formatting SaleCo timestamp as date:', err2);
+            }
+          }
+        }
+        
+        drawField(thaiText.reviewedBy, document.SaleCoReviewName || 'N/A');
+        drawField(thaiText.timestamp, salecoTimestamp);
+        
+        // Make sure to still display the completed status
+        if (document.status === 'Completed') {
+          drawField(thaiText.status, 'Completed');
+        }
       }
 
-      // Add QR Code in the top-right corner
+      // Add QR Code in the top-right corner - make it even smaller
       if (hasQRCode) {
         try {
-          doc.image(qrCodePath, doc.page.width - 130, 40, { width: 80 });
+          // Make QR code smaller and position it well
+          doc.image(qrCodePath, doc.page.width - 100, 40, { width: 50 });
           doc.fontSize(fontSize.small)
              .font(fonts.regular)
              .fillColor(colors.lightGray)
-             .text('Scan for PDF', doc.page.width - 130, 125, { width: 80, align: 'center' });
+             .text('Scan for PDF', doc.page.width - 100, 95, { width: 50, align: 'center' });
         } catch (qrError) {
           console.error('Error adding QR code to PDF:', qrError);
         }
       }
 
-      // Add ISO number at the bottom right
-      doc.fontSize(fontSize.small)
-         .font(fonts.regular)
-         .fillColor(colors.lightGray)
-         .text('QMS-FM-36-012 (R00.,06/10/2014)', doc.page.width - 200, doc.page.height - 50, { align: 'right' });
-
-      // Add footer with timestamp
-      const generateTime = new Date().toLocaleString('en-GB');
+      // Add a single footer with all information
+      // Position at the bottom of the page, but only on the first page
+      const footerY = doc.page.height - 50;
       
+      // ISO number at the bottom right
       doc.fontSize(fontSize.small)
          .font(fonts.regular)
          .fillColor(colors.lightGray)
-         .text(`${thaiText.generated}: ${generateTime}`, 50, doc.page.height - 50);
-         
-      doc.fontSize(fontSize.small)
-         .font(fonts.regular)
-         .fillColor(colors.lightGray)
-         .text(`${thaiText.docId}: ${document.Document_id}`, doc.page.width - 200, doc.page.height - 35, { align: 'right' });
+         .text('QMS-FM-36-012 (R00.,06/10/2014)', doc.page.width - 200, footerY, { align: 'right' });
 
-      // Finalize the PDF
+      // Generation timestamp at the bottom left
+      const generateTime = new Date().toLocaleString('en-GB');
+      doc.fontSize(fontSize.small)
+         .font(fonts.regular)
+         .fillColor(colors.lightGray)
+         .text(`${thaiText.generated}: ${generateTime}`, 50, footerY);
+         
+      // Document ID just below the ISO number
+      doc.fontSize(fontSize.small)
+         .font(fonts.regular)
+         .fillColor(colors.lightGray)
+         .text(`${thaiText.docId}: ${document.Document_id}`, doc.page.width - 200, footerY + 15, { align: 'right' });
+
+      // Finalize the PDF - no need to call doc.end() twice
       doc.end();
 
       // Wait for the stream to finish
