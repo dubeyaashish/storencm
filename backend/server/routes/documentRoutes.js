@@ -59,9 +59,9 @@ const storage = multer.diskStorage({
 
 // Add file filter to only allow images
 const fileFilter = (req, file, cb) => {
-  // Accept images only
-  if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
-    return cb(new Error('Only image files are allowed!'), false);
+  // Accept images and PDFs
+  if (!file.originalname.match(/\.(jpg|jpeg|png|gif|pdf)$/)) {
+    return cb(new Error('Only image files and PDFs are allowed!'), false);
   }
   cb(null, true);
 };
@@ -70,7 +70,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit
   }
 });
 
@@ -184,6 +184,15 @@ router.post(
   '/:id/regenerate-pdf',
   authenticateJWT,
   dc.regeneratePdf
+);
+
+// Update in documentRoutes.js
+router.post(
+  '/:id/complete-saleco-review',
+  authenticateJWT,
+  authorizeRoles(['SaleCo']),
+  upload.single('attachment'), // Changed to single file upload
+  dc.completeSaleCoReview
 );
 
 module.exports = router;

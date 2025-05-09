@@ -375,6 +375,7 @@ exports.updateQADetails = async (req, res) => {
       return res.status(404).json({ message: 'Document not found' });
     }
     
+    // Make sure the remarks field is included in the updates
     db.pool.query(
       `UPDATE documents_nc SET ? WHERE id = ?`,
       [req.body, id],
@@ -384,12 +385,14 @@ exports.updateQADetails = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
+        const pdfUrl = await regeneratePdfAfterStatusChange(id);
+        
         const [[updatedDoc]] = await db.pool.promise().query(
           `SELECT * FROM documents_nc WHERE id = ?`,
           [id]
         );
         
-        updatedDoc.PdfUrl = updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+        updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
         console.log('Document before notifyStatusChange (updateQADetails):', updatedDoc);
         
         if (req.body.status === 'Send to Manufacture' || req.body.status === 'Send to Environment' || req.body.status === 'Send to SaleCo') {
@@ -400,7 +403,10 @@ exports.updateQADetails = async (req, res) => {
           }
         }
         
-        res.json({ message: 'QA details saved' });
+        res.json({ 
+          message: 'QA details saved',
+          pdfUrl: updatedDoc.PdfUrl
+        });
       }
     );
   } catch (ex) {
@@ -589,38 +595,64 @@ exports.completeSaleCoReview = async (req, res) => {
       return res.status(404).json({ message: 'Document not found' });
     }
     
+    // Process file upload if any
+    let SaleCoAttachment = null;
+    let SaleCoAttachmentType = null;
+
+    if (req.file) {
+      const relativePath = `/uploads/${req.file.filename}`;
+      SaleCoAttachment = relativePath;
+      SaleCoAttachmentType = req.file.mimetype;
+      console.log('SaleCo Attachment path:', SaleCoAttachment);
+      console.log('SaleCo Attachment type:', SaleCoAttachmentType);
+    }
+    
+    const reviewerName = req.user.name || 'SaleCo User';
+    
+    // Create update data object
+    const updateData = {
+      status: 'Completed',
+      DamageCost: req.body.DamageCost,
+      DepartmentExpense: req.body.DepartmentExpense,
+      SaleCoReviewName: reviewerName,
+      SaleCoReviewTimeStamp: new Date()
+    };
+
+    // Add attachment info if file was uploaded
+    if (SaleCoAttachment) {
+      updateData.SaleCoAttachment = SaleCoAttachment;
+      updateData.SaleCoAttachmentType = SaleCoAttachmentType;
+    }
+    
     db.pool.query(
-      `
-      UPDATE documents_nc
-      SET
-        status = 'Completed',
-        DamageCost = ?,
-        DepartmentExpense = ?,
-        SaleCoReviewName = ?,
-        SaleCoReviewTimeStamp = NOW()
-      WHERE id = ?`,
-      [req.body.DamageCost, req.body.DepartmentExpense, req.user.name, id],
+      `UPDATE documents_nc SET ? WHERE id = ?`,
+      [updateData, id],
       async (err) => {
         if (err) {
           console.error('[completeSaleCoReview] DB error:', err);
           return res.status(500).json({ message: err.message });
         }
         
+        const pdfUrl = await regeneratePdfAfterStatusChange(id);
+        
         const [[updatedDoc]] = await db.pool.promise().query(
           `SELECT * FROM documents_nc WHERE id = ?`,
           [id]
         );
         
-        updatedDoc.PdfUrl = updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+        updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
         console.log('Document before notifyStatusChange (completeSaleCoReview):', updatedDoc);
         
         try {
-          await notifyStatusChange(updatedDoc, 'Completed', req.user.name);
+          await notifyStatusChange(updatedDoc, 'Completed', reviewerName);
         } catch (notifyError) {
           console.error('Failed to send Telegram notification:', notifyError);
         }
         
-        res.json({ message: 'Document marked as complete' });
+        res.json({ 
+          message: 'Document marked as complete',
+          pdfUrl: updatedDoc.PdfUrl
+        });
       }
     );
   } catch (ex) {
@@ -959,57 +991,68 @@ exports.acceptEnvironment = async (req, res) => {
 exports.completeSaleCoReview = async (req, res) => {
   const id = +req.params.id;
   
+  console.log('completeSaleCoReview called with ID:', id);
+  console.log('Request body:', req.body);
+  console.log('Request file:', req.file);
+  
   try {
-    const [doc] = await db.pool.promise().query(
+    // First, check if the document exists
+    const [docs] = await db.pool.promise().query(
       `SELECT * FROM documents_nc WHERE id = ?`,
       [id]
     );
     
-    if (!doc.length) {
+    if (!docs.length) {
       return res.status(404).json({ message: 'Document not found' });
     }
     
+    // Get the reviewer name from the request user
+    const reviewerName = req.user.name || 'SaleCo User';
+    
+    // Create a simple update object 
+    const updateData = {
+      status: 'Completed',
+      SaleCoReviewName: reviewerName,
+      SaleCoReviewTimeStamp: new Date()
+    };
+    
+    // Safely add DamageCost if provided
+    if (req.body && req.body.DamageCost !== undefined) {
+      updateData.DamageCost = req.body.DamageCost;
+    }
+    
+    // Safely add DepartmentExpense if provided
+    if (req.body && req.body.DepartmentExpense !== undefined) {
+      updateData.DepartmentExpense = req.body.DepartmentExpense;
+    }
+    
+    // Add attachment info if file was uploaded
+    if (req.file) {
+      const relativePath = `/uploads/${req.file.filename}`;
+      updateData.SaleCoAttachment = relativePath;
+      updateData.SaleCoAttachmentType = req.file.mimetype;
+    }
+    
+    console.log('Final update data:', updateData);
+    
+    // Update the document
     db.pool.query(
-      `
-      UPDATE documents_nc
-      SET
-        status = 'Completed',
-        DamageCost = ?,
-        DepartmentExpense = ?,
-        SaleCoReviewName = ?,
-        SaleCoReviewTimeStamp = NOW()
-      WHERE id = ?`,
-      [req.body.DamageCost, req.body.DepartmentExpense, req.user.name, id],
-      async (err) => {
+      `UPDATE documents_nc SET ? WHERE id = ?`,
+      [updateData, id],
+      (err) => {
         if (err) {
           console.error('[completeSaleCoReview] DB error:', err);
           return res.status(500).json({ message: err.message });
         }
         
-        const pdfUrl = await regeneratePdfAfterStatusChange(id);
-        
-        const [[updatedDoc]] = await db.pool.promise().query(
-          `SELECT * FROM documents_nc WHERE id = ?`,
-          [id]
-        );
-        
-        updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
-        console.log('Document before notifyStatusChange (completeSaleCoReview):', updatedDoc);
-        
-        try {
-          await notifyStatusChange(updatedDoc, 'Completed', req.user.name);
-        } catch (notifyError) {
-          console.error('Failed to send Telegram notification:', notifyError);
-        }
-        
+        // Success response
         res.json({ 
           message: 'Document marked as complete',
-          pdfUrl: updatedDoc.PdfUrl
         });
       }
     );
   } catch (ex) {
-    console.error('[completeSaleCoReview] Unexpected:', ex);
-    res.status(500).json({ message: ex.message });
+    console.error('[completeSaleCoReview] Unexpected error:', ex);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };

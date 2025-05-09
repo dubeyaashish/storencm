@@ -102,7 +102,8 @@ export default function QADashboard() {
     QASolution: '',
     QASolutionDescription: '',
     Person1: '',
-    Person2: ''
+    Person2: '',
+    QARemarks: '' 
   });
 
   // Interceptors
@@ -651,53 +652,66 @@ export default function QADashboard() {
       <Dialog open={dialogOpen} onClose={()=>setDialogOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Complete QA Assessment</DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt:1 }}>
-            <Grid item xs={12}>
-              <Select
-                label="Solution Title"
-                name="QASolution"
-                fullWidth
-                value={form.QASolution}
-                onChange={handleFormChange}
-                displayEmpty
-              >
-                <MenuItem value="" disabled>Select a solution</MenuItem>
-                {qaSolutionOptions.map((option) => (
-                  <MenuItem key={option} value={option}>{option}</MenuItem>
-                ))}
-              </Select>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Solution Details"
-                name="QASolutionDescription"
-                multiline
-                rows={3}
-                fullWidth
-                value={form.QASolutionDescription}
-                onChange={handleFormChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Person 1"
-                name="Person1"
-                fullWidth
-                value={form.Person1}
-                onChange={handleFormChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Person 2"
-                name="Person2"
-                fullWidth
-                value={form.Person2}
-                onChange={handleFormChange}
-              />
-            </Grid>
+        <Grid container spacing={2} sx={{ mt:1 }}>
+          <Grid item xs={12}>
+            <Select
+              label="Solution Title"
+              name="QASolution"
+              fullWidth
+              value={form.QASolution}
+              onChange={handleFormChange}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>Select a solution</MenuItem>
+              {qaSolutionOptions.map((option) => (
+                <MenuItem key={option} value={option}>{option}</MenuItem>
+              ))}
+            </Select>
           </Grid>
-        </DialogContent>
+          <Grid item xs={12}>
+            <TextField
+              label="Solution Details"
+              name="QASolutionDescription"
+              multiline
+              rows={3}
+              fullWidth
+              value={form.QASolutionDescription}
+              onChange={handleFormChange}
+            />
+          </Grid>
+          {/* Add the new QA Remarks field */}
+          <Grid item xs={12}>
+            <TextField
+              label="QA Remarks (for SaleCo/Manufacturing)"
+              name="QARemarks"
+              multiline
+              rows={2}
+              fullWidth
+              value={form.QARemarks}
+              onChange={handleFormChange}
+              placeholder="Additional notes or recommendations for SaleCo or Manufacturing"
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField
+              label="Person 1"
+              name="Person1"
+              fullWidth
+              value={form.Person1}
+              onChange={handleFormChange}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField
+              label="Person 2"
+              name="Person2"
+              fullWidth
+              value={form.Person2}
+              onChange={handleFormChange}
+            />
+          </Grid>
+        </Grid>
+      </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
           <Button 
             onClick={()=>handleSendTo('manufacture')} 

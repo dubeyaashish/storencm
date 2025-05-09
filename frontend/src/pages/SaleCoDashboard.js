@@ -43,7 +43,8 @@ import {
   Description as DescriptionIcon,
   GridView as GridViewIcon,
   ViewList as ViewListIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  AttachFile as AttachFileIcon 
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -79,13 +80,24 @@ const SaleCoDashboard = () => {
   const [currentDoc, setCurrentDoc] = useState(null);
   const [completionForm, setCompletionForm] = useState({
     DamageCost: '',
-    DepartmentExpense: ''
+    DepartmentExpense: '',
+    attachment: null
   });
   
   // Fetch documents on component mount
   useEffect(() => {
     fetchDocuments();
   }, []);
+
+  const handleFileChange = (e) => {
+    const { files } = e.target;
+    if (files && files[0]) {
+      setCompletionForm(prev => ({
+        ...prev,
+        attachment: files[0]
+      }));
+    }
+  };
 
   // Filter documents when search term changes
   useEffect(() => {
@@ -198,50 +210,46 @@ const SaleCoDashboard = () => {
   };
 
   // Handle completing document sent from QA
-  const handleCompleteQAReview = async () => {
-    if (!currentDoc) return;
+// In SaleCoDashboard.js
+const handleCompleteQAReview = async () => {
+  if (!currentDoc) return;
+  
+  try {
+    // Create FormData to send file
+    const formData = new FormData();
     
-    try {
-      // Send the form data with the completion request
-      await axios.post(
-        `/api/documents/${currentDoc.id}/complete-saleco-review`, 
-        completionForm,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        }
-      );
-      
-      // Update state locally
-      setDocs(docs.map(doc => {
-        if (doc.id !== currentDoc.id) return doc;
-        return {
-          ...doc,
-          ...completionForm,
-          status: 'Completed'
-        };
-      }));
-      
-      // Show success notification
-      setNotification({
-        open: true,
-        message: 'Document marked as complete',
-        severity: 'success'
-      });
-      
-      // Close the dialog
-      setCompletionDialogOpen(false);
-    } catch (err) {
-      console.error('Error completing document:', err);
-      
-      // Show error notification
-      setNotification({
-        open: true,
-        message: err.response?.data?.message || 'Error completing document',
-        severity: 'error'
-      });
+    // Make sure to append these as strings
+    formData.append('DamageCost', completionForm.DamageCost || '0');
+    formData.append('DepartmentExpense', completionForm.DepartmentExpense || '');
+    
+    if (completionForm.attachment) {
+      formData.append('attachment', completionForm.attachment);
     }
-  };
-
+    
+    // Send the form data with the completion request
+    await axios.post(
+      `/api/documents/${currentDoc.id}/complete-saleco-review`, 
+      formData,
+      {
+        headers: { 
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
+    
+    // Rest of the function remains the same...
+  } catch (err) {
+    console.error('Error completing document:', err);
+    
+    // Show error notification
+    setNotification({
+      open: true,
+      message: err.response?.data?.message || 'Error completing document',
+      severity: 'error'
+    });
+  }
+};
   // Format date function
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -600,54 +608,81 @@ const SaleCoDashboard = () => {
       )}
       
       {/* Completion Dialog */}
-      <Dialog 
-        open={completionDialogOpen} 
-        onClose={() => setCompletionDialogOpen(false)}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Complete Document Review</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <Typography variant="body2" gutterBottom>
-                Please enter the damage cost and department expense for this document before marking it as complete.
-              </Typography>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Damage Cost"
-                name="DamageCost"
-                type="number"
-                fullWidth
-                value={completionForm.DamageCost}
-                onChange={handleFormChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Department Expense"
-                name="DepartmentExpense"
-                type="text"
-                fullWidth
-                value={completionForm.DepartmentExpense}
-                onChange={handleFormChange}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCompletionDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleCompleteQAReview} 
-            variant="contained" 
-            color="success"
-            startIcon={<CheckCircleIcon />}
-          >
-            Complete Review
-          </Button>
-        </DialogActions>
-      </Dialog>
+{/* Completion Dialog */}
+<Dialog 
+  open={completionDialogOpen} 
+  onClose={() => setCompletionDialogOpen(false)}
+  fullWidth
+  maxWidth="sm"
+>
+  <DialogTitle>Complete Document Review</DialogTitle>
+  <DialogContent>
+    <Grid container spacing={2} sx={{ mt: 1 }}>
+      <Grid item xs={12}>
+        <Typography variant="body2" gutterBottom>
+          Please enter the damage cost and department expense for this document before marking it as complete.
+          You can also attach a file (image or PDF) to document your findings.
+        </Typography>
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <TextField
+          label="Damage Cost"
+          name="DamageCost"
+          type="number"
+          fullWidth
+          value={completionForm.DamageCost}
+          onChange={handleFormChange}
+        />
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <TextField
+          label="Department Expense"
+          name="DepartmentExpense"
+          type="text"
+          fullWidth
+          value={completionForm.DepartmentExpense}
+          onChange={handleFormChange}
+        />
+      </Grid>
+      
+      {/* File upload field */}
+      <Grid item xs={12}>
+        <Button
+          variant="outlined"
+          component="label"
+          startIcon={<AttachFileIcon />}
+          fullWidth
+          sx={{ height: '56px', mt: 1 }}
+        >
+          {completionForm.attachment ? completionForm.attachment.name : "Upload Supporting Document (Image/PDF)"}
+          <input
+            type="file"
+            hidden
+            name="attachment"
+            accept="image/*,.pdf"
+            onChange={handleFileChange}
+          />
+        </Button>
+        {completionForm.attachment && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+            Selected file: {completionForm.attachment.name} ({(completionForm.attachment.size / 1024).toFixed(2)} KB)
+          </Typography>
+        )}
+      </Grid>
+    </Grid>
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={() => setCompletionDialogOpen(false)}>Cancel</Button>
+    <Button 
+      onClick={handleCompleteQAReview} 
+      variant="contained" 
+      color="success"
+      startIcon={<CheckCircleIcon />}
+    >
+      Complete Review
+    </Button>
+  </DialogActions>
+</Dialog>
       
       {/* Notification */}
       <Snackbar

@@ -22,7 +22,9 @@ import {
   Factory as ManufactureIcon,
   Nature as EnvironmentIcon,
   Report as ReportIcon,
-  Description as DescriptionIcon
+  Description as DescriptionIcon,
+  AttachFile as AttachFileIcon,
+  PictureAsPdf as PictureAsPdfIcon
 } from '@mui/icons-material';
 
 export default function DocumentView() {
@@ -248,10 +250,11 @@ export default function DocumentView() {
               <Divider sx={{ mb: 2 }} />
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
-                  <Typography><strong>QA Accepted By:</strong> {doc.QAName || 'N/A'}</Typography>
+                  <Typography><strong>QA Accepted By:</strong> {doc.QAName}</Typography>
                   <Typography><strong>QA Timestamp:</strong> {formatDate(doc.QATimeStamp)}</Typography>
-                  <Typography><strong>QA Solution:</strong> {doc.QASolution || 'N/A'}</Typography>
-                  <Typography><strong>Solution Description:</strong> {doc.QASolutionDescription || 'N/A'}</Typography>
+                  <Typography><strong>QA Solution:</strong> {doc.QASolution}</Typography>
+                  <Typography><strong>Solution Description:</strong> {doc.QASolutionDescription}</Typography>
+                  <Typography><strong>Remark:</strong> {doc.QARemarks}</Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography><strong>Person 1:</strong> {doc.Person1 || 'N/A'}</Typography>
@@ -329,27 +332,60 @@ export default function DocumentView() {
           </Grid>
         )}
         
-        {/* SaleCo Review - Show if sent to SaleCo */}
-        {(doc.status === 'Send to SaleCo' || doc.status === 'Completed') && (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom color="primary">
-                SaleCo Review
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
-              {doc.status === 'Send to SaleCo' ? (
-                <Typography color="text.secondary">
-                  Document is pending SaleCo review
-                </Typography>
-              ) : (
-                <>
-                  <Typography><strong>SaleCo Review By:</strong> {doc.SaleCoReviewName || 'N/A'}</Typography>
-                  <Typography><strong>SaleCo Review Timestamp:</strong> {formatDate(doc.SaleCoReviewTimeStamp)}</Typography>
-                </>
-              )}
-            </Paper>
-          </Grid>
-        )}
+{/* SaleCo Review Section with Attachment */}
+{(doc.SaleCoReviewName || doc.SaleCoReviewTimeStamp || doc.status === 'Completed') && (
+  <Grid item xs={12}>
+    <Paper sx={{ p: 3 }}>
+      <Typography variant="h6" gutterBottom color="primary">
+        SaleCo Review
+      </Typography>
+      <Divider sx={{ mb: 2 }} />
+      <Typography><strong>Reviewed By:</strong> {doc.SaleCoReviewName || 'N/A'}</Typography>
+      <Typography><strong>Review Timestamp:</strong> {formatDate(doc.SaleCoReviewTimeStamp)}</Typography>
+      <Typography><strong>Damage Cost:</strong> {doc.DamageCost || 'N/A'}</Typography>
+      <Typography><strong>Department Expense:</strong> {doc.DepartmentExpense || 'N/A'}</Typography>
+      
+      {/* Display attachment if available */}
+      {doc.SaleCoAttachment && (
+        <Box mt={2}>
+          <Typography><strong>Supporting Document:</strong></Typography>
+          {doc.SaleCoAttachmentType && doc.SaleCoAttachmentType.startsWith('image/') ? (
+            // Display image
+            <Box
+              component="img"
+              sx={{
+                maxWidth: '100%',
+                maxHeight: '400px',
+                mt: 1,
+                border: '1px solid #eee',
+                borderRadius: 1
+              }}
+              src={doc.SaleCoAttachment}
+              alt="SaleCo supporting document"
+              onError={(e) => {
+                console.error('Error loading image:', doc.SaleCoAttachment);
+                e.target.src = '/placeholder-image.png';
+                e.target.alt = 'Image not available';
+              }}
+            />
+          ) : (
+            // Display PDF or other file type as link
+            <Button
+              variant="outlined"
+              startIcon={<AttachFileIcon />}
+              component="a"
+              href={doc.SaleCoAttachment}
+              target="_blank"
+              sx={{ mt: 1 }}
+            >
+              Open Attachment
+            </Button>
+          )}
+        </Box>
+      )}
+    </Paper>
+  </Grid>
+)}
 
         {/* Status History */}
         <Grid item xs={12}>
