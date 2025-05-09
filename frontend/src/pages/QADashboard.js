@@ -1,4 +1,3 @@
-// client/src/pages/QADashboard.js
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import {
@@ -34,7 +33,9 @@ import {
   TableCell,
   Tooltip,
   Stack,
-  Pagination
+  Pagination,
+  MenuItem,
+  Select
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -62,8 +63,22 @@ const statusColors = {
   'Completed': 'success',
   'Rejected': 'error',
   'Send to Manufacture': 'warning',
-  'Send to Environment': 'success'
+  'Send to Environment': 'success',
+  'Send to SaleCo': 'primary'
 };
+
+// Dropdown options for QASolution
+const qaSolutionOptions = [
+  'Reject',
+  'ปล่อยผ่านในกรณีพิเศษ',
+  'Repack',
+  'นำเข้า code 0 (Rework)',
+  'นำเข้า Code 0',
+  'ทำลายทิ้งให้สิ้นสภาพ',
+  'Recall Product',
+  'ออก PAR ในระบบ',
+  'ความเห็นอื่นๆ'
+];
 
 export default function QADashboard() {
   const [docs, setDocs] = useState([]);
@@ -87,12 +102,10 @@ export default function QADashboard() {
     QASolution: '',
     QASolutionDescription: '',
     Person1: '',
-    Person2: '',
-    DamageCost: '',
-    DepartmentExpense: ''
+    Person2: ''
   });
 
-  // 1) Interceptors
+  // Interceptors
   useEffect(() => {
     axios.interceptors.request.use(cfg => {
       const t = localStorage.getItem('token');
@@ -111,7 +124,7 @@ export default function QADashboard() {
     );
   }, []);
 
-  // 2) Fetch on mount
+  // Fetch on mount
   useEffect(() => {
     fetchDocs();
   }, []);
@@ -142,7 +155,7 @@ export default function QADashboard() {
     }
   }
 
-  // 3) Filter & tabs
+  // Filter & tabs
   useEffect(() => {
     let fd = [...docs];
     if (tabValue === 1) {
@@ -150,7 +163,7 @@ export default function QADashboard() {
     } else if (tabValue === 2) {
       fd = fd.filter(d => d.status.startsWith('Accepted'));
     } else if (tabValue === 3) {
-      fd = fd.filter(d => ['Completed', 'Rejected', 'Send to Manufacture', 'Send to Environment'].includes(d.status));
+      fd = fd.filter(d => ['Completed', 'Rejected', 'Send to Manufacture', 'Send to Environment', 'Send to SaleCo'].includes(d.status));
     }
     if (searchTerm) {
       const t = searchTerm.toLowerCase();
@@ -197,10 +210,10 @@ export default function QADashboard() {
   // Handle immediate acceptance without showing dialog
   const handleAccept = async (doc) => {
     try {
-      // 1) Accept QA
+      // Accept QA
       await axios.post(`/api/documents/${doc.id}/accept-qa`);
       
-      // 2) Update UI
+      // Update UI
       const newStatus = doc.status === 'Accepted by Inventory'
         ? 'Accepted by Both'
         : 'Accepted by QA';
@@ -237,9 +250,7 @@ export default function QADashboard() {
       QASolution: doc.QASolution || '',
       QASolutionDescription: doc.QASolutionDescription || '',
       Person1: doc.Person1 || '',
-      Person2: doc.Person2 || '',
-      DamageCost: doc.DamageCost || '',
-      DepartmentExpense: doc.DepartmentExpense || ''
+      Person2: doc.Person2 || ''
     });
     setDialogOpen(true);
   };
@@ -249,7 +260,7 @@ export default function QADashboard() {
     setForm(f => ({ ...f, [name]: value }));
   };
 
-  // Handle sending to either Manufacture or Environment
+  // Handle sending to either Manufacture or SaleCo
   const handleSendTo = async (destination) => {
     if (!currentDoc) return;
     
@@ -304,7 +315,7 @@ export default function QADashboard() {
       const updatedDocs = docs.filter(doc => doc.id !== docId);
       setDocs(updatedDocs);
       
-// Show success notification
+      // Show success notification
       setNotification({
         open: true,
         message: 'Document deleted successfully',
@@ -312,7 +323,6 @@ export default function QADashboard() {
       });
     } catch (err) {
       console.error('Error deleting document:', err);
-      // Show error notification
       setNotification({
         open: true,
         message: err.response?.data?.message || 'Error deleting document',
@@ -332,7 +342,6 @@ export default function QADashboard() {
 
   return (
     <>
-    {/* 1) Helmet goes here */}
     <Helmet>
       <title>QA</title>
     </Helmet>
@@ -357,7 +366,6 @@ export default function QADashboard() {
             <ToggleButton value="grid"><GridViewIcon/></ToggleButton>
             <ToggleButton value="table"><ViewListIcon/></ToggleButton>
           </ToggleButtonGroup>
-          {/* Add Create Document Button */}
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -487,12 +495,6 @@ export default function QADashboard() {
                       <Typography variant="body2" gutterBottom>
                         <strong>QA Solution:</strong> {truncateText(doc.QASolution, 50)}
                       </Typography>
-                      
-                      {doc.DamageCost && (
-                        <Typography variant="body2" gutterBottom>
-                          <strong>Damage Cost:</strong> ${doc.DamageCost}
-                        </Typography>
-                      )}
                     </>
                   )}
                   
@@ -651,13 +653,19 @@ export default function QADashboard() {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt:1 }}>
             <Grid item xs={12}>
-              <TextField
+              <Select
                 label="Solution Title"
                 name="QASolution"
                 fullWidth
                 value={form.QASolution}
                 onChange={handleFormChange}
-              />
+                displayEmpty
+              >
+                <MenuItem value="" disabled>Select a solution</MenuItem>
+                {qaSolutionOptions.map((option) => (
+                  <MenuItem key={option} value={option}>{option}</MenuItem>
+                ))}
+              </Select>
             </Grid>
             <Grid item xs={12}>
               <TextField
@@ -685,26 +693,6 @@ export default function QADashboard() {
                 name="Person2"
                 fullWidth
                 value={form.Person2}
-                onChange={handleFormChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Damage Cost"
-                name="DamageCost"
-                type="number"
-                fullWidth
-                value={form.DamageCost}
-                onChange={handleFormChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Dept Expense"
-                name="DepartmentExpense"
-                type="number"
-                fullWidth
-                value={form.DepartmentExpense}
                 onChange={handleFormChange}
               />
             </Grid>

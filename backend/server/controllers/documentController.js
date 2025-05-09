@@ -179,8 +179,6 @@ exports.createNewDocument = async (req, res) => {
   }
 };
 
-// Rest of the documentController.js remains the same...
-
 exports.getDocumentsByRole = (req, res) => {
   const { role, userId } = req.user;
   let sql, params = [];
@@ -190,7 +188,7 @@ exports.getDocumentsByRole = (req, res) => {
       SELECT d.*, u.name AS creatorName
       FROM documents_nc d
       JOIN NC_Login u ON d.createdBy = u.id
-      WHERE d.createdBy = ?
+      WHERE d.createdBy = ? OR d.status = 'Send to SaleCo'
       ORDER BY d.created_at DESC
     `;
     params.push(userId);
@@ -270,8 +268,7 @@ exports.acceptInventory = async (req, res) => {
         END,
         InventoryName = ?,
         InventoryTimeStamp = NOW()
-      WHERE id = ?
-      `,
+      WHERE id = ?`,
       [name, id],
       async (err) => {
         if (err) {
@@ -330,8 +327,7 @@ exports.acceptQA = async (req, res) => {
         END,
         QAName = ?,
         QATimeStamp = NOW()
-      WHERE id = ?
-      `,
+      WHERE id = ?`,
       [name, id],
       async (err) => {
         if (err) {
@@ -396,7 +392,7 @@ exports.updateQADetails = async (req, res) => {
         updatedDoc.PdfUrl = updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
         console.log('Document before notifyStatusChange (updateQADetails):', updatedDoc);
         
-        if (req.body.status === 'Send to Manufacture' || req.body.status === 'Send to Environment') {
+        if (req.body.status === 'Send to Manufacture' || req.body.status === 'Send to Environment' || req.body.status === 'Send to SaleCo') {
           try {
             await notifyStatusChange(updatedDoc, req.body.status, req.user.name || 'QA');
           } catch (notifyError) {
@@ -455,8 +451,7 @@ exports.acceptManufacturing = async (req, res) => {
         status = 'Accepted by Manufacture',
         ManufacturingName = ?,
         ManufacturingTimeStamp = NOW()
-      WHERE id = ?
-      `,
+      WHERE id = ?`,
       [name, id],
       async (err) => {
         if (err) {
@@ -508,8 +503,7 @@ exports.acceptEnvironment = async (req, res) => {
         status = 'Accepted by Environment',
         EnvironmentName = ?,
         EnvironmentTimeStamp = NOW()
-      WHERE id = ?
-      `,
+      WHERE id = ?`,
       [name, id],
       async (err) => {
         if (err) {
@@ -580,9 +574,8 @@ exports.regeneratePdf = async (req, res) => {
     console.error('Error regenerating PDF:', error);
     res.status(500).json({ message: 'Error regenerating PDF' });
   }
-
 };
-// Add this function to documentController.js
+
 exports.completeSaleCoReview = async (req, res) => {
   const id = +req.params.id;
   
@@ -601,11 +594,12 @@ exports.completeSaleCoReview = async (req, res) => {
       UPDATE documents_nc
       SET
         status = 'Completed',
+        DamageCost = ?,
+        DepartmentExpense = ?,
         SaleCoReviewName = ?,
         SaleCoReviewTimeStamp = NOW()
-      WHERE id = ?
-      `,
-      [req.user.name, id],
+      WHERE id = ?`,
+      [req.body.DamageCost, req.body.DepartmentExpense, req.user.name, id],
       async (err) => {
         if (err) {
           console.error('[completeSaleCoReview] DB error:', err);
@@ -634,17 +628,9 @@ exports.completeSaleCoReview = async (req, res) => {
     res.status(500).json({ message: ex.message });
   }
 };
-// backend/server/controllers/documentController.js (excerpt)
-// Add this before each of the status update functions to ensure the PDF is regenerated
 
-/**
- * Regenerate PDF after status changes
- * @param {Number} docId - Document ID
- * @returns {Promise<String>} URL to the regenerated PDF
- */
 async function regeneratePdfAfterStatusChange(docId) {
   try {
-    // Get the updated document data
     const [[updatedDoc]] = await db.pool.promise().query(
       `SELECT d.*, u.name AS creatorName
        FROM documents_nc d 
@@ -658,13 +644,9 @@ async function regeneratePdfAfterStatusChange(docId) {
       return null;
     }
     
-    // Regenerate the PDF with the updated data
     const pdfPath = await generateFormPDF(updatedDoc);
-    
-    // Get and update the PDF URL
     const pdfUrl = getPdfUrl(updatedDoc.Document_id);
     
-    // Update PDF URL in database if needed
     if (updatedDoc.PdfUrl !== pdfUrl) {
       await db.pool.promise().query(
         `UPDATE documents_nc SET PdfUrl = ? WHERE id = ?`,
@@ -680,7 +662,6 @@ async function regeneratePdfAfterStatusChange(docId) {
   }
 }
 
-// Update the acceptInventory function
 exports.acceptInventory = async (req, res) => {
   const id = +req.params.id;
   const name = req.user.name;
@@ -705,8 +686,7 @@ exports.acceptInventory = async (req, res) => {
         END,
         InventoryName = ?,
         InventoryTimeStamp = NOW()
-      WHERE id = ?
-      `,
+      WHERE id = ?`,
       [name, id],
       async (err) => {
         if (err) {
@@ -714,7 +694,6 @@ exports.acceptInventory = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Regenerate PDF with updated status
         const pdfUrl = await regeneratePdfAfterStatusChange(id);
         
         const [[updatedDoc]] = await db.pool.promise().query(
@@ -722,7 +701,6 @@ exports.acceptInventory = async (req, res) => {
           [id]
         );
         
-        // Use the regenerated PDF URL or fall back
         updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
         console.log('Document before notifyStatusChange (acceptInventory):', updatedDoc);
         
@@ -748,7 +726,6 @@ exports.acceptInventory = async (req, res) => {
   }
 };
 
-// Update the acceptQA function
 exports.acceptQA = async (req, res) => {
   const id = +req.params.id;
   const name = req.user.name;
@@ -773,8 +750,7 @@ exports.acceptQA = async (req, res) => {
         END,
         QAName = ?,
         QATimeStamp = NOW()
-      WHERE id = ?
-      `,
+      WHERE id = ?`,
       [name, id],
       async (err) => {
         if (err) {
@@ -782,7 +758,6 @@ exports.acceptQA = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Regenerate PDF with updated status
         const pdfUrl = await regeneratePdfAfterStatusChange(id);
         
         const [[updatedDoc]] = await db.pool.promise().query(
@@ -790,7 +765,6 @@ exports.acceptQA = async (req, res) => {
           [id]
         );
         
-        // Use the regenerated PDF URL or fall back
         updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
         console.log('Document before notifyStatusChange (acceptQA):', updatedDoc);
         
@@ -816,7 +790,6 @@ exports.acceptQA = async (req, res) => {
   }
 };
 
-// Update updateQADetails function
 exports.updateQADetails = async (req, res) => {
   const id = +req.params.id;
   
@@ -839,7 +812,6 @@ exports.updateQADetails = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Regenerate PDF with updated details
         const pdfUrl = await regeneratePdfAfterStatusChange(id);
         
         const [[updatedDoc]] = await db.pool.promise().query(
@@ -847,11 +819,10 @@ exports.updateQADetails = async (req, res) => {
           [id]
         );
         
-        // Use the regenerated PDF URL or fall back
         updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
         console.log('Document before notifyStatusChange (updateQADetails):', updatedDoc);
         
-        if (req.body.status === 'Send to Manufacture' || req.body.status === 'Send to Environment') {
+        if (req.body.status === 'Send to Manufacture' || req.body.status === 'Send to Environment' || req.body.status === 'Send to SaleCo') {
           try {
             await notifyStatusChange(updatedDoc, req.body.status, req.user.name || 'QA');
           } catch (notifyError) {
@@ -871,7 +842,6 @@ exports.updateQADetails = async (req, res) => {
   }
 };
 
-// Update acceptManufacturing function
 exports.acceptManufacturing = async (req, res) => {
   const id = +req.params.id;
   const name = req.user.name;
@@ -893,8 +863,7 @@ exports.acceptManufacturing = async (req, res) => {
         status = 'Accepted by Manufacture',
         ManufacturingName = ?,
         ManufacturingTimeStamp = NOW()
-      WHERE id = ?
-      `,
+      WHERE id = ?`,
       [name, id],
       async (err) => {
         if (err) {
@@ -902,7 +871,6 @@ exports.acceptManufacturing = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Regenerate PDF with updated status
         const pdfUrl = await regeneratePdfAfterStatusChange(id);
         
         const [[updatedDoc]] = await db.pool.promise().query(
@@ -910,7 +878,6 @@ exports.acceptManufacturing = async (req, res) => {
           [id]
         );
         
-        // Use the regenerated PDF URL or fall back
         updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
         console.log('Document before notifyStatusChange (acceptManufacturing):', updatedDoc);
         
@@ -932,7 +899,6 @@ exports.acceptManufacturing = async (req, res) => {
   }
 };
 
-// Update acceptEnvironment function
 exports.acceptEnvironment = async (req, res) => {
   const id = +req.params.id;
   const name = req.user.name;
@@ -954,8 +920,7 @@ exports.acceptEnvironment = async (req, res) => {
         status = 'Accepted by Environment',
         EnvironmentName = ?,
         EnvironmentTimeStamp = NOW()
-      WHERE id = ?
-      `,
+      WHERE id = ?`,
       [name, id],
       async (err) => {
         if (err) {
@@ -963,7 +928,6 @@ exports.acceptEnvironment = async (req, res) => {
           return res.status(500).json({ message: err.message });
         }
         
-        // Regenerate PDF with updated status
         const pdfUrl = await regeneratePdfAfterStatusChange(id);
         
         const [[updatedDoc]] = await db.pool.promise().query(
@@ -971,7 +935,6 @@ exports.acceptEnvironment = async (req, res) => {
           [id]
         );
         
-        // Use the regenerated PDF URL or fall back
         updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
         console.log('Document before notifyStatusChange (acceptEnvironment):', updatedDoc);
         
@@ -993,7 +956,6 @@ exports.acceptEnvironment = async (req, res) => {
   }
 };
 
-// Update completeSaleCoReview function
 exports.completeSaleCoReview = async (req, res) => {
   const id = +req.params.id;
   
@@ -1012,18 +974,18 @@ exports.completeSaleCoReview = async (req, res) => {
       UPDATE documents_nc
       SET
         status = 'Completed',
+        DamageCost = ?,
+        DepartmentExpense = ?,
         SaleCoReviewName = ?,
         SaleCoReviewTimeStamp = NOW()
-      WHERE id = ?
-      `,
-      [req.user.name, id],
+      WHERE id = ?`,
+      [req.body.DamageCost, req.body.DepartmentExpense, req.user.name, id],
       async (err) => {
         if (err) {
           console.error('[completeSaleCoReview] DB error:', err);
           return res.status(500).json({ message: err.message });
         }
         
-        // Regenerate PDF with updated status
         const pdfUrl = await regeneratePdfAfterStatusChange(id);
         
         const [[updatedDoc]] = await db.pool.promise().query(
@@ -1031,7 +993,6 @@ exports.completeSaleCoReview = async (req, res) => {
           [id]
         );
         
-        // Use the regenerated PDF URL or fall back
         updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
         console.log('Document before notifyStatusChange (completeSaleCoReview):', updatedDoc);
         
@@ -1049,182 +1010,6 @@ exports.completeSaleCoReview = async (req, res) => {
     );
   } catch (ex) {
     console.error('[completeSaleCoReview] Unexpected:', ex);
-    res.status(500).json({ message: ex.message });
-  }
-};
-
-// Update the createNewDocument function to ensure PDF generation works from the start
-exports.createNewDocument = async (req, res) => {
-  console.log('💾 createNewDocument req.body:', req.body);
-  console.log('💾 createNewDocument req.files:', req.files);
-
-  try {
-    // 1) Build Document_id prefix WNCMMYY
-    const now = new Date();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const yy = String(now.getFullYear()).slice(-2);
-    const prefix = `WNC${yy}${mm}`;
-
-    // 2) Find last sequence this month
-    const [[{ last }]] = await db.pool
-      .promise()
-      .query(
-        `SELECT MAX(Document_id) AS last
-         FROM documents_nc
-         WHERE Document_id LIKE ?`,
-        [`${prefix}%`]
-      );
-    const seq = last
-      ? String(parseInt(last.slice(-4), 10) + 1).padStart(4, '0')
-      : '0001';
-
-    // Get the absolute path to uploads directory
-    const uploadsDir = path.join(__dirname, '..', 'Uploads');
-    
-    // Ensure uploads directory exists
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-      console.log('Created uploads directory on demand:', uploadsDir);
-    }
-
-    // Construct image URLs with proper paths
-    let Img1 = null;
-    let Img2 = null;
-
-    if (req.files?.picture1?.[0]?.filename) {
-      const relativePath = `/Uploads/${req.files.picture1[0].filename}`;
-      Img1 = relativePath;
-      console.log('Img1 path:', Img1);
-    }
-
-    if (req.files?.picture2?.[0]?.filename) {
-      const relativePath = `/Uploads/${req.files.picture2[0].filename}`;
-      Img2 = relativePath;
-      console.log('Img2 path:', Img2);
-    }
-
-    // 3) Assemble data from text fields & uploaded files
-    const doc = {
-      Document_id: prefix + seq,
-      status: 'Created',
-      createdBy: req.user.userId,
-      Product_id: req.body.productId,
-      Sn_number: req.body.snNumber,
-      Description: req.body.description,
-      date: new Date(),
-      Lot_No: req.body.lotNo,
-      Product_size: req.body.size,
-      Quantity: parseInt(req.body.quantity, 10),
-      Issue_Found: req.body.issueFound,
-      Foundee: req.body.foundeeName,
-      Department: req.body.department,
-      Issue_Description: req.body.whatHappened,
-      Prevention: req.body.preventionMeasure,
-      Img1,
-      Img2
-    };
-
-    // Log the document data being prepared for PDF
-    console.log('Document data for PDF:', doc);
-
-    // 4) Insert into DB
-    db.pool.query(
-      `INSERT INTO documents_nc SET ?`,
-      doc,
-      async (err, result) => {
-        if (err) {
-          console.error('[createNewDocument] DB error:', err);
-          return res.status(500).json({ message: err.message });
-        }
-        
-        // Generate PDF form from document data
-        let PdfUrl = null;
-        try {
-          // Get full document data
-          const [fullDoc] = await db.pool.promise().query(
-            `SELECT d.*, u.name AS creatorName
-             FROM documents_nc d 
-             JOIN NC_Login u ON d.createdBy = u.id
-             WHERE d.id = ?`,
-            [result.insertId]
-          );
-          
-          if (fullDoc && fullDoc.length > 0) {
-            console.log('Full document data for PDF:', fullDoc[0]);
-            
-            // Generate the PDF form with improved function
-            const pdfPath = await generateFormPDF(fullDoc[0]);
-            
-            // Get full URL to the PDF
-            PdfUrl = getPdfUrl(fullDoc[0].Document_id);
-            
-            // Add PDF URL to the document
-            await db.pool.promise().query(
-              `UPDATE documents_nc SET PdfUrl = ? WHERE id = ?`,
-              [PdfUrl, result.insertId]
-            );
-            
-            // Log document object before notification
-            console.log('Document before notifyDocumentCreated:', { ...fullDoc[0], PdfUrl });
-            
-            // Send Telegram notification with PDF link
-            await notifyDocumentCreated({
-              ...fullDoc[0],
-              PdfUrl
-            });
-          } else {
-            // Fall back to basic document data
-            const generatedPdfPath = await generateFormPDF(doc);
-            PdfUrl = getPdfUrl(doc.Document_id);
-            
-            await db.pool.promise().query(
-              `UPDATE documents_nc SET PdfUrl = ? WHERE id = ?`,
-              [PdfUrl, result.insertId]
-            );
-            
-            console.log('Fallback document before notifyDocumentCreated:', { ...doc, PdfUrl });
-            
-            await notifyDocumentCreated({
-              ...doc,
-              PdfUrl
-            });
-          }
-        } catch (pdfError) {
-          console.error('Failed to generate PDF form:', pdfError);
-          
-          // Send Telegram notification without PDF link
-          try {
-            const [fullDoc] = await db.pool.promise().query(
-              `SELECT d.*, u.name AS creatorName
-               FROM documents_nc d 
-               JOIN NC_Login u ON d.createdBy = u.id
-               WHERE d.id = ?`,
-              [result.insertId]
-            );
-            
-            if (fullDoc && fullDoc.length > 0) {
-              console.log('Document before notifyDocumentCreated (no PDF):', fullDoc[0]);
-              await notifyDocumentCreated(fullDoc[0]);
-            } else {
-              console.log('Fallback document before notifyDocumentCreated (no PDF):', doc);
-              await notifyDocumentCreated(doc);
-            }
-          } catch (notifyError) {
-            console.error('Failed to send Telegram notification:', notifyError);
-          }
-        }
-        
-        res.status(201).json({ 
-          message: 'Document created', 
-          id: result.insertId,
-          documentId: doc.Document_id,
-          PdfUrl
-        });
-      }
-    );
-
-  } catch (ex) {
-    console.error('[createNewDocument] Unexpected:', ex);
     res.status(500).json({ message: ex.message });
   }
 };

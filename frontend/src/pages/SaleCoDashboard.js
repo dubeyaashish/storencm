@@ -1,4 +1,3 @@
-// client/src/pages/SaleCoDashboard.js
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import {
@@ -28,7 +27,11 @@ import {
   TableRow,
   TableCell,
   Pagination,
-  Stack
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import {
@@ -70,6 +73,14 @@ const SaleCoDashboard = () => {
   // Pagination states
   const [page, setPage] = useState(1);
   const [rowsPerPage] = useState(9); // 9 for grid (3x3), 10 for table
+  
+  // Dialog state for completion
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
+  const [currentDoc, setCurrentDoc] = useState(null);
+  const [completionForm, setCompletionForm] = useState({
+    DamageCost: '',
+    DepartmentExpense: ''
+  });
   
   // Fetch documents on component mount
   useEffect(() => {
@@ -167,22 +178,45 @@ const SaleCoDashboard = () => {
     }
   };
 
+  // Handle opening the completion dialog
+  const handleOpenCompletionDialog = (doc) => {
+    setCurrentDoc(doc);
+    setCompletionForm({
+      DamageCost: doc.DamageCost || '',
+      DepartmentExpense: doc.DepartmentExpense || ''
+    });
+    setCompletionDialogOpen(true);
+  };
+
+  // Handle form field changes
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setCompletionForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   // Handle completing document sent from QA
-  const handleCompleteQAReview = async (docId) => {
-    if (!window.confirm('Mark this document as reviewed?')) {
-      return;
-    }
+  const handleCompleteQAReview = async () => {
+    if (!currentDoc) return;
     
     try {
-      await axios.post(`/api/documents/${docId}/complete-saleco-review`, {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      // Send the form data with the completion request
+      await axios.post(
+        `/api/documents/${currentDoc.id}/complete-saleco-review`, 
+        completionForm,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        }
+      );
       
       // Update state locally
       setDocs(docs.map(doc => {
-        if (doc.id !== docId) return doc;
+        if (doc.id !== currentDoc.id) return doc;
         return {
           ...doc,
+          ...completionForm,
           status: 'Completed'
         };
       }));
@@ -193,6 +227,9 @@ const SaleCoDashboard = () => {
         message: 'Document marked as complete',
         severity: 'success'
       });
+      
+      // Close the dialog
+      setCompletionDialogOpen(false);
     } catch (err) {
       console.error('Error completing document:', err);
       
@@ -257,7 +294,6 @@ const SaleCoDashboard = () => {
 
   return (
     <>
-    {/* 1) Helmet goes here */}
     <Helmet>
       <title>SaleCo</title>
     </Helmet>
@@ -418,6 +454,18 @@ const SaleCoDashboard = () => {
                       {doc.InventoryTimeStamp && ` (${formatDate(doc.InventoryTimeStamp)})`}
                     </Typography>
                   )}
+                  
+                  {doc.DamageCost && (
+                    <Typography variant="body2" gutterBottom>
+                      <strong>Damage Cost:</strong> {doc.DamageCost || 'N/A'}
+                    </Typography>
+                  )}
+                  
+                  {doc.DepartmentExpense && (
+                    <Typography variant="body2" gutterBottom>
+                      <strong>Department Expense:</strong> {doc.DepartmentExpense || 'N/A'}
+                    </Typography>
+                  )}
                 </CardContent>
                 
                 <CardActions sx={{ justifyContent: 'flex-end', p: 1 }}>
@@ -434,16 +482,13 @@ const SaleCoDashboard = () => {
                   
                   {doc.status === 'Created' && (
                     <Tooltip title="Delete document">
-                      <span>
-                        <IconButton 
-                          size="small" 
-                          onClick={() => handleDelete(doc.id)}
-                          color="error"
-                          disabled={doc.status !== 'Created'}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </span>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDelete(doc.id)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
                     </Tooltip>
                   )}
                   
@@ -451,7 +496,7 @@ const SaleCoDashboard = () => {
                     <Tooltip title="Mark as complete">
                       <IconButton 
                         size="small"
-                        onClick={() => handleCompleteQAReview(doc.id)}
+                        onClick={() => handleOpenCompletionDialog(doc)}
                         color="success"
                       >
                         <CheckCircleIcon fontSize="small" />
@@ -476,6 +521,8 @@ const SaleCoDashboard = () => {
                 <TableCell>Lot No</TableCell>
                 <TableCell>Quantity</TableCell>
                 <TableCell>Issue</TableCell>
+                <TableCell>Damage Cost</TableCell>
+                <TableCell>Department Expense</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>Actions</TableCell>
@@ -489,6 +536,8 @@ const SaleCoDashboard = () => {
                   <TableCell>{doc.Lot_No}</TableCell>
                   <TableCell>{doc.Quantity}</TableCell>
                   <TableCell>{truncateText(doc.Issue_Found, 40)}</TableCell>
+                  <TableCell>{doc.DamageCost || 'N/A'}</TableCell>
+                  <TableCell>{doc.DepartmentExpense || 'N/A'}</TableCell>
                   <TableCell>
                     <Chip label={doc.status} color={statusColors[doc.status] || 'default'} />
                   </TableCell>
@@ -506,16 +555,13 @@ const SaleCoDashboard = () => {
                       </Tooltip>
                       {doc.status === 'Created' && (
                         <Tooltip title="Delete document">
-                          <span>
-                            <IconButton 
-                              size="small"
-                              onClick={() => handleDelete(doc.id)}
-                              color="error"
-                              disabled={doc.status !== 'Created'}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </span>
+                          <IconButton 
+                            size="small"
+                            onClick={() => handleDelete(doc.id)}
+                            color="error"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
                         </Tooltip>
                       )}
                       
@@ -523,7 +569,7 @@ const SaleCoDashboard = () => {
                         <Tooltip title="Mark as complete">
                           <IconButton 
                             size="small"
-                            onClick={() => handleCompleteQAReview(doc.id)}
+                            onClick={() => handleOpenCompletionDialog(doc)}
                             color="success"
                           >
                             <CheckCircleIcon fontSize="small" />
@@ -552,6 +598,56 @@ const SaleCoDashboard = () => {
           />
         </Box>
       )}
+      
+      {/* Completion Dialog */}
+      <Dialog 
+        open={completionDialogOpen} 
+        onClose={() => setCompletionDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Complete Document Review</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <Typography variant="body2" gutterBottom>
+                Please enter the damage cost and department expense for this document before marking it as complete.
+              </Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Damage Cost"
+                name="DamageCost"
+                type="number"
+                fullWidth
+                value={completionForm.DamageCost}
+                onChange={handleFormChange}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Department Expense"
+                name="DepartmentExpense"
+                type="text"
+                fullWidth
+                value={completionForm.DepartmentExpense}
+                onChange={handleFormChange}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCompletionDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleCompleteQAReview} 
+            variant="contained" 
+            color="success"
+            startIcon={<CheckCircleIcon />}
+          >
+            Complete Review
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       {/* Notification */}
       <Snackbar
