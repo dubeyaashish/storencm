@@ -584,80 +584,81 @@ exports.regeneratePdf = async (req, res) => {
 
 exports.completeSaleCoReview = async (req, res) => {
   const id = +req.params.id;
-  
+
+  console.log('completeSaleCoReview called with ID:', id);
+  console.log('Request body:', req.body);
+  console.log('Request file:', req.file);
+
   try {
-    const [doc] = await db.pool.promise().query(
-      `SELECT * FROM documents_nc WHERE id = ?`,
-      [id]
-    );
-    
-    if (!doc.length) {
+    // Check if the document exists
+    const [docs] = await db.pool.promise().query(`SELECT * FROM documents_nc WHERE id = ?`, [id]);
+    if (!docs.length) {
       return res.status(404).json({ message: 'Document not found' });
     }
-    
-    // Process file upload if any
-    let SaleCoAttachment = null;
-    let SaleCoAttachmentType = null;
 
-    if (req.file) {
-      const relativePath = `/uploads/${req.file.filename}`;
-      SaleCoAttachment = relativePath;
-      SaleCoAttachmentType = req.file.mimetype;
-      console.log('SaleCo Attachment path:', SaleCoAttachment);
-      console.log('SaleCo Attachment type:', SaleCoAttachmentType);
-    }
-    
+    // Get the reviewer name from the request user
     const reviewerName = req.user.name || 'SaleCo User';
-    
-    // Create update data object
+
+    // Create update object
     const updateData = {
       status: 'Completed',
-      DamageCost: req.body.DamageCost,
-      DepartmentExpense: req.body.DepartmentExpense,
       SaleCoReviewName: reviewerName,
-      SaleCoReviewTimeStamp: new Date()
+      SaleCoReviewTimeStamp: new Date(),
     };
 
-    // Add attachment info if file was uploaded
-    if (SaleCoAttachment) {
-      updateData.SaleCoAttachment = SaleCoAttachment;
-      updateData.SaleCoAttachmentType = SaleCoAttachmentType;
+    // Add DamageCost and DepartmentExpense if provided
+    if (req.body && req.body.DamageCost !== undefined) {
+      updateData.DamageCost = req.body.DamageCost;
     }
-    
-    db.pool.query(
-      `UPDATE documents_nc SET ? WHERE id = ?`,
-      [updateData, id],
-      async (err) => {
-        if (err) {
-          console.error('[completeSaleCoReview] DB error:', err);
-          return res.status(500).json({ message: err.message });
-        }
-        
-        const pdfUrl = await regeneratePdfAfterStatusChange(id);
-        
-        const [[updatedDoc]] = await db.pool.promise().query(
-          `SELECT * FROM documents_nc WHERE id = ?`,
-          [id]
-        );
-        
-        updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
-        console.log('Document before notifyStatusChange (completeSaleCoReview):', updatedDoc);
-        
-        try {
-          await notifyStatusChange(updatedDoc, 'Completed', reviewerName);
-        } catch (notifyError) {
-          console.error('Failed to send Telegram notification:', notifyError);
-        }
-        
-        res.json({ 
-          message: 'Document marked as complete',
-          pdfUrl: updatedDoc.PdfUrl
-        });
-      }
-    );
+    if (req.body && req.body.DepartmentExpense !== undefined) {
+      updateData.DepartmentExpense = req.body.DepartmentExpense;
+    }
+
+    // Add attachment info if file was uploaded
+    if (req.file) {
+      const relativePath = `/uploads/${req.file.filename}`;
+      updateData.SaleCoAttachment = relativePath;
+      updateData.SaleCoAttachmentType = req.file.mimetype;
+      console.log(`File uploaded: ${req.file.filename}, stored at path: ${relativePath}`);
+    }
+
+    console.log('Final update data:', updateData);
+
+    // Update the document
+    await db.pool.promise().query(`UPDATE documents_nc SET ? WHERE id = ?`, [updateData, id]);
+
+    // Get the updated document
+    const [[updatedDoc]] = await db.pool.promise().query(`SELECT * FROM documents_nc WHERE id = ?`, [id]);
+
+    // Regenerate PDF
+    let pdfUrl = null;
+    try {
+      pdfUrl = await regeneratePdfAfterStatusChange(id);
+    } catch (pdfError) {
+      console.error('Error regenerating PDF:', pdfError);
+    }
+
+    // Ensure PdfUrl is set
+    updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+
+    // Send notification
+    try {
+      await notifyStatusChange(updatedDoc, 'Completed', reviewerName);
+    } catch (notifyError) {
+      console.error('Failed to send Telegram notification:', notifyError);
+    }
+
+    // Success response
+    res.json({
+      message: 'Document Marked as Completed',
+      document: {
+        ...updatedDoc,
+        PdfUrl: updatedDoc.PdfUrl,
+      },
+    });
   } catch (ex) {
-    console.error('[completeSaleCoReview] Unexpected:', ex);
-    res.status(500).json({ message: ex.message });
+    console.error('[completeSaleCoReview] Unexpected error:', ex);
+    res.status(500).json({ message: 'Internal server error', error: ex.message });
   }
 };
 
@@ -988,6 +989,8 @@ exports.acceptEnvironment = async (req, res) => {
   }
 };
 
+// In backend/server/controllers/documentController.js - Update the completeSaleCoReview function
+
 exports.completeSaleCoReview = async (req, res) => {
   const id = +req.params.id;
   
@@ -1009,7 +1012,7 @@ exports.completeSaleCoReview = async (req, res) => {
     // Get the reviewer name from the request user
     const reviewerName = req.user.name || 'SaleCo User';
     
-    // Create a simple update object 
+    // Create a detailed update object 
     const updateData = {
       status: 'Completed',
       SaleCoReviewName: reviewerName,
@@ -1036,23 +1039,52 @@ exports.completeSaleCoReview = async (req, res) => {
     console.log('Final update data:', updateData);
     
     // Update the document
-    db.pool.query(
+    await db.pool.promise().query(
       `UPDATE documents_nc SET ? WHERE id = ?`,
-      [updateData, id],
-      (err) => {
-        if (err) {
-          console.error('[completeSaleCoReview] DB error:', err);
-          return res.status(500).json({ message: err.message });
-        }
-        
-        // Success response
-        res.json({ 
-          message: 'Document marked as complete',
-        });
-      }
+      [updateData, id]
     );
+    
+    // Get the updated document for notification/PDF generation
+    const [[updatedDoc]] = await db.pool.promise().query(
+      `SELECT * FROM documents_nc WHERE id = ?`,
+      [id]
+    );
+    
+    // Regenerate PDF if available
+    let pdfUrl = null;
+    try {
+      if (typeof regeneratePdfAfterStatusChange === 'function') {
+        pdfUrl = await regeneratePdfAfterStatusChange(id);
+      }
+    } catch (pdfError) {
+      console.error('Error regenerating PDF:', pdfError);
+    }
+    
+    // Add the PDF URL to the response if available
+    const responseData = { 
+      message: 'Document marked as complete',
+    };
+    
+    if (pdfUrl) {
+      responseData.pdfUrl = pdfUrl;
+    }
+    
+    // Try to send notification
+    try {
+      // Make sure updatedDoc has all the necessary properties
+      if (updatedDoc) {
+        updatedDoc.PdfUrl = pdfUrl || updatedDoc.PdfUrl || getPdfUrl(updatedDoc.Document_id);
+        await notifyStatusChange(updatedDoc, 'Completed', reviewerName);
+      }
+    } catch (notifyError) {
+      console.error('Failed to send notification:', notifyError);
+    }
+    
+    // Success response
+    res.json(responseData);
+    
   } catch (ex) {
     console.error('[completeSaleCoReview] Unexpected error:', ex);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: ex.message });
   }
 };

@@ -209,47 +209,74 @@ const SaleCoDashboard = () => {
     }));
   };
 
-  // Handle completing document sent from QA
-// In SaleCoDashboard.js
-const handleCompleteQAReview = async () => {
-  if (!currentDoc) return;
+  const handleCompleteQAReview = async () => {
+    if (!currentDoc) return;
   
-  try {
-    // Create FormData to send file
-    const formData = new FormData();
-    
-    // Make sure to append these as strings
-    formData.append('DamageCost', completionForm.DamageCost || '0');
-    formData.append('DepartmentExpense', completionForm.DepartmentExpense || '');
-    
-    if (completionForm.attachment) {
-      formData.append('attachment', completionForm.attachment);
-    }
-    
-    // Send the form data with the completion request
-    await axios.post(
-      `/api/documents/${currentDoc.id}/complete-saleco-review`, 
-      formData,
-      {
-        headers: { 
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'multipart/form-data'
-        }
+    try {
+      console.log('Starting SaleCo completion process...');
+      console.log('Current document:', currentDoc);
+      console.log('Form data:', completionForm);
+  
+      // Create FormData to send file
+      const formData = new FormData();
+  
+      // Add form fields
+      formData.append('DamageCost', completionForm.DamageCost || '0');
+      formData.append('DepartmentExpense', completionForm.DepartmentExpense || '');
+  
+      // Add attachment if present
+      if (completionForm.attachment) {
+        console.log('Attaching file:', completionForm.attachment.name);
+        formData.append('attachment', completionForm.attachment);
       }
-    );
-    
-    // Rest of the function remains the same...
-  } catch (err) {
-    console.error('Error completing document:', err);
-    
-    // Show error notification
-    setNotification({
-      open: true,
-      message: err.response?.data?.message || 'Error completing document',
-      severity: 'error'
-    });
-  }
-};
+  
+      // Make the API call
+      const response = await axios({
+        method: 'post',
+        url: `/api/documents/${currentDoc.id}/complete-saleco-review`,
+        data: formData,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+  
+      console.log('API response:', response.data);
+  
+      // Update the document in the state
+      setDocs(docs.map((d) => {
+        if (d.id !== currentDoc.id) return d;
+        return {
+          ...d,
+          status: 'Completed',
+          DamageCost: completionForm.DamageCost || d.DamageCost,
+          DepartmentExpense: completionForm.DepartmentExpense || d.DepartmentExpense,
+          SaleCoAttachment: response.data.document?.SaleCoAttachment || d.SaleCoAttachment,
+          SaleCoAttachmentType: response.data.document?.SaleCoAttachmentType || d.SaleCoAttachmentType,
+        };
+      }));
+  
+      // Show success notification
+      setNotification({
+        open: true,
+        message: 'Document completed successfully',
+        severity: 'success',
+      });
+  
+      // Close the dialog
+      setCompletionDialogOpen(false);
+    } catch (err) {
+      console.error('Error completing document:', err);
+      console.log('Error details:', err.response?.data);
+  
+      // Show error notification
+      setNotification({
+        open: true,
+        message: err.response?.data?.message || 'Error completing document',
+        severity: 'error',
+      });
+    }
+  };
   // Format date function
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";

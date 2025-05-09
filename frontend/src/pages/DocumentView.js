@@ -151,13 +151,13 @@ export default function DocumentView() {
               Basic Information
             </Typography>
             <Divider sx={{ mb: 2 }} />
-            <Typography><strong>Product ID:</strong> {doc.Product_id || 'N/A'}</Typography>
+            <Typography><strong>รหัสสินค้า:</strong> {doc.Product_id || 'N/A'}</Typography>
             <Typography><strong>Serial #:</strong> {doc.Sn_number || 'N/A'}</Typography>
-            <Typography><strong>Description:</strong> {doc.Description || 'N/A'}</Typography>
+            <Typography><strong>รายละเอียดสินค้า:</strong> {doc.Description || 'N/A'}</Typography>
             <Typography><strong>Lot No:</strong> {doc.Lot_No || 'N/A'}</Typography>
-            <Typography><strong>Size:</strong> {doc.Product_size || 'N/A'}</Typography>
-            <Typography><strong>Quantity:</strong> {doc.Quantity || 'N/A'}</Typography>
-            <Typography><strong>Date Created:</strong> {formatDate(doc.date)}</Typography>
+            <Typography><strong>ขนาด:</strong> {doc.Product_size || 'N/A'}</Typography>
+            <Typography><strong>จำนวน:</strong> {doc.Quantity || 'N/A'}</Typography>
+            <Typography><strong>วันที่สร้างเอกสาร:</strong> {formatDate(doc.date)}</Typography>
           </Paper>
         </Grid>
 
@@ -168,11 +168,11 @@ export default function DocumentView() {
               Issue Details
             </Typography>
             <Divider sx={{ mb: 2 }} />
-            <Typography><strong>Issue Found:</strong> {doc.Issue_Found || 'N/A'}</Typography>
-            <Typography><strong>Issue Description:</strong> {doc.Issue_Description || 'N/A'}</Typography>
-            <Typography><strong>Foundee:</strong> {doc.Foundee || 'N/A'}</Typography>
-            <Typography><strong>Department:</strong> {doc.Department || 'N/A'}</Typography>
-            <Typography><strong>Prevention Measure:</strong> {doc.Prevention || 'N/A'}</Typography>
+            <Typography><strong>ปัญหาที่พบ:</strong> {doc.Issue_Found || 'N/A'}</Typography>
+            <Typography><strong>รายละเอียดปํญหา:</strong> {doc.Issue_Description || 'N/A'}</Typography>
+            <Typography><strong>ผู้ที่พบเจอปํญหา:</strong> {doc.Foundee || 'N/A'}</Typography>
+            <Typography><strong>แผนก:</strong> {doc.Department || 'N/A'}</Typography>
+            <Typography><strong>วิธีแก้ไขปํญหา:</strong> {doc.Prevention || 'N/A'}</Typography>
           </Paper>
         </Grid>
 
@@ -250,17 +250,15 @@ export default function DocumentView() {
               <Divider sx={{ mb: 2 }} />
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
-                  <Typography><strong>QA Accepted By:</strong> {doc.QAName}</Typography>
+                  <Typography><strong>QA ที่รับเรื่อง:</strong> {doc.QAName}</Typography>
                   <Typography><strong>QA Timestamp:</strong> {formatDate(doc.QATimeStamp)}</Typography>
-                  <Typography><strong>QA Solution:</strong> {doc.QASolution}</Typography>
-                  <Typography><strong>Solution Description:</strong> {doc.QASolutionDescription}</Typography>
+                  <Typography><strong>วิธีแก้ไขปํญหา:</strong> {doc.QASolution}</Typography>
+                  <Typography><strong>รายละเอียดปํญหา:</strong> {doc.QASolutionDescription}</Typography>
                   <Typography><strong>Remark:</strong> {doc.QARemarks}</Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography><strong>Person 1:</strong> {doc.Person1 || 'N/A'}</Typography>
                   <Typography><strong>Person 2:</strong> {doc.Person2 || 'N/A'}</Typography>
-                  <Typography><strong>Damage Cost:</strong> {doc.DamageCost ? `$${doc.DamageCost}` : 'N/A'}</Typography>
-                  <Typography><strong>Department Expense:</strong> {doc.DepartmentExpense || 'N/A'}</Typography>
                 </Grid>
               </Grid>
             </Paper>
@@ -277,7 +275,7 @@ export default function DocumentView() {
                 Inventory Assessment
               </Typography>
               <Divider sx={{ mb: 2 }} />
-              <Typography><strong>Inventory Accepted By:</strong> {doc.InventoryName || 'N/A'}</Typography>
+              <Typography><strong>คลังที่รับเรื่อง:</strong> {doc.InventoryName || 'N/A'}</Typography>
               <Typography><strong>Inventory Timestamp:</strong> {formatDate(doc.InventoryTimeStamp)}</Typography>
             </Paper>
           </Grid>
@@ -298,7 +296,7 @@ export default function DocumentView() {
                 </Typography>
               ) : (
                 <>
-                  <Typography><strong>Manufacturing Accepted By:</strong> {doc.ManufacturingName || 'N/A'}</Typography>
+                  <Typography><strong>ผู้ผลิตที่รับเรื่อง:</strong> {doc.ManufacturingName || 'N/A'}</Typography>
                   <Typography><strong>Manufacturing Timestamp:</strong> {formatDate(doc.ManufacturingTimeStamp)}</Typography>
                   <Typography><strong>Manufacturing Comments:</strong> {doc.ManufacturingComments || 'N/A'}</Typography>
                 </>
@@ -322,7 +320,7 @@ export default function DocumentView() {
                 </Typography>
               ) : (
                 <>
-                  <Typography><strong>Environment Accepted By:</strong> {doc.EnvironmentName || 'N/A'}</Typography>
+                  <Typography><strong>สิ่งแวดล้อมที่รับเรื่อง:</strong> {doc.EnvironmentName || 'N/A'}</Typography>
                   <Typography><strong>Environment Timestamp:</strong> {formatDate(doc.EnvironmentTimeStamp)}</Typography>
                   <Typography><strong>Environmental Impact:</strong> {doc.EnvironmentalImpact || 'N/A'}</Typography>
                   <Typography><strong>Mitigation Measures:</strong> {doc.MitigationMeasures || 'N/A'}</Typography>
@@ -342,8 +340,8 @@ export default function DocumentView() {
       <Divider sx={{ mb: 2 }} />
       <Typography><strong>Reviewed By:</strong> {doc.SaleCoReviewName || 'N/A'}</Typography>
       <Typography><strong>Review Timestamp:</strong> {formatDate(doc.SaleCoReviewTimeStamp)}</Typography>
-      <Typography><strong>Damage Cost:</strong> {doc.DamageCost || 'N/A'}</Typography>
-      <Typography><strong>Department Expense:</strong> {doc.DepartmentExpense || 'N/A'}</Typography>
+      <Typography><strong>ต้นทุน:</strong> {doc.DamageCost || 'N/A'}</Typography>
+      <Typography><strong>ค่าใช้จ่ายแผนก:</strong> {doc.DepartmentExpense || 'N/A'}</Typography>
       
       {/* Display attachment if available */}
       {doc.SaleCoAttachment && (
@@ -386,7 +384,6 @@ export default function DocumentView() {
     </Paper>
   </Grid>
 )}
-
         {/* Status History */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
@@ -394,30 +391,30 @@ export default function DocumentView() {
               Status History
             </Typography>
             <Divider sx={{ mb: 2 }} />
-            <Typography><strong>Created:</strong> {formatDate(doc.created_at)}</Typography>
+            <Typography><strong>วันที่สร้างเอกสาร:</strong> {formatDate(doc.created_at)}</Typography>
             {doc.InventoryTimeStamp && (
               <Typography>
-                <strong>Accepted by Inventory:</strong> {formatDate(doc.InventoryTimeStamp)}
+                <strong>คลังรับเรื่องวันที่:</strong> {formatDate(doc.InventoryTimeStamp)}
               </Typography>
             )}
             {doc.QATimeStamp && (
               <Typography>
-                <strong>Accepted by QA:</strong> {formatDate(doc.QATimeStamp)}
+                <strong>QAรับเรื่องวันที่:</strong> {formatDate(doc.QATimeStamp)}
               </Typography>
             )}
             {doc.ManufacturingTimeStamp && (
               <Typography>
-                <strong>Accepted by Manufacturing:</strong> {formatDate(doc.ManufacturingTimeStamp)}
+                <strong>ผู้ผลิตรับเรื่องวันที่:</strong> {formatDate(doc.ManufacturingTimeStamp)}
               </Typography>
             )}
             {doc.EnvironmentTimeStamp && (
               <Typography>
-                <strong>Accepted by Environment:</strong> {formatDate(doc.EnvironmentTimeStamp)}
+                <strong>สิงแวดล้อมรับเรื่องวันที่:</strong> {formatDate(doc.EnvironmentTimeStamp)}
               </Typography>
             )}
             {doc.SaleCoReviewTimeStamp && (
               <Typography>
-                <strong>Reviewed by SaleCo:</strong> {formatDate(doc.SaleCoReviewTimeStamp)}
+                <strong>Reviewed ประสานงานขาย:</strong> {formatDate(doc.SaleCoReviewTimeStamp)}
               </Typography>
             )}
           </Paper>
